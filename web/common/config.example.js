@@ -1,0 +1,6 @@
+window.LINKDN_CONFIG = {
+  API_BASE: 'https://YOUR-RENDER-URL.onrender.com',
+  SUPABASE_URL: 'https://YOUR-SUPABASE-PROJECT.supabase.co',
+  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_BROWSER_KEY',
+  APP_NAME: "Linkd'N V2"
+};
