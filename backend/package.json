@@ -1,5 +1,5 @@
 {
-  "name": "linkdn-v2-backend",
+  "name": "linkdn-v2-live-backend",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -8,6 +8,8 @@
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.2"
+    "express": "^4.19.2",
+    "livekit-server-sdk": "^2.10.2",
+    "@supabase/supabase-js": "^2.49.1"
   }
 }
