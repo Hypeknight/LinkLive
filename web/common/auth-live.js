@@ -58,19 +58,49 @@ window.LinkdNAuthLive = (() => {
   }
 
   async function getProfile() {
-    const supabase = getSupabase();
-    const user = await getUser();
-    if (!user) return null;
+  const supabase = getSupabase();
+  const user = await getUser();
+  if (!user) return null;
 
-    const { data, error } = await supabase
+  // Try to get profile
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  // 🔥 If profile DOES NOT exist → create it automatically
+  if (!data) {
+    console.log("No profile found. Creating one...");
+
+    const { error: insertError } = await supabase
+      .from("profiles")
+      .insert({
+        id: user.id,
+        role: "owner", // default role
+        email: user.email,
+        display_name: user.email?.split("@")[0] || "New User",
+        active: true
+      });
+
+    if (insertError) throw insertError;
+
+    // fetch again after insert
+    const { data: newProfile, error: newError } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .single();
 
-    if (error) throw error;
-    return data;
+    if (newError) throw newError;
+
+    return newProfile;
   }
+
+  return data;
+}
 
   return {
     signUp,
