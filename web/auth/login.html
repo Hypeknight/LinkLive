@@ -1,1 +1,30 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Login</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js"></script><script src="/common/supabase.js"></script><script src="/common/auth-live.js"></script></head><body><div class="page-wrap"><div class="form-card"><h2>Login</h2><form id="form" class="form-stack"><input type="email" name="email" placeholder="Email" required><input type="password" name="password" placeholder="Password" required><div class="form-actions"><button type="submit">Login</button></div></form><p id="status" class="notice hidden"></p><p><a href="/auth/register.html">Create account</a></p></div></div><script>const f=document.getElementById('form'),s=document.getElementById('status');f.addEventListener('submit',async e=>{e.preventDefault();s.classList.add('hidden');try{const data=Object.fromEntries(new FormData(f).entries());await LinkdNAuthLive.signIn(data);const p=await LinkdNAuthLive.getProfile();location.href=(p.role==='moderator'||p.role==='admin')?'/admin/dashboard.html':'/owner/dashboard.html';}catch(err){s.textContent=err.message||'Login failed';s.classList.remove('hidden')}});</script></body></html>
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Login</title>
+        <link rel="stylesheet" href="/common/app.css">
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="/common/config.js"></script>
+        <script src="/common/supabase.js"></script>
+        <script src="/common/auth-live.js"></script>
+    </head>
+    <body>
+        <div class="page-wrap">
+            <div class="form-card">
+                <h2>Login</h2>
+                <form id="form" class="form-stack">
+                    <input type="email" name="email" placeholder="Email" required>
+                    <input type="password" name="password" placeholder="Password" required>
+                    <div class="form-actions">
+                        <button type="submit">Login</button>
+                    </div>
+                </form>
+                <p id="status" class="notice hidden"></p>
+                <p><a href="/auth/register.html">Create account</a></p>
+            </div>
+        </div>
+        <script>const f=document.getElementById('form'),s=document.getElementById('status');f.addEventListener('submit',async e=>{e.preventDefault();s.classList.add('hidden');try{const data=Object.fromEntries(new FormData(f).entries());await LinkdNAuthLive.signIn(data);const p=await LinkdNAuthLive.getProfile();location.href=(p.role==='moderator'||p.role==='admin')?'/admin/dashboard.html':'/owner/dashboard.html';}catch(err){s.textContent=err.message||'Login failed';s.classList.remove('hidden')}});</script>
+    </body>
+</html>
