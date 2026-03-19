@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venue Viewing Screen</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.7/livekit-client.umd.js"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/livekit.js"></script>
+  <script src="/common/venue-shell.js"></script>
+  <script src="/common/venue-live.js"></script>
+  <style>
+    .view-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 18px;
+      margin-top: 20px;
+    }
+    .video-wall, .schedule-panel {
+      background: #10203a;
+      border: 1px solid #27416b;
+      border-radius: 16px;
+      padding: 16px;
+      min-height: 360px;
+    }
+    .video-wall video, .video-wall audio {
+      width: 100%;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      background: #000;
+    }
+    @media (max-width: 900px) {
+      .view-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="form-card" style="margin-top:20px;">
+      <p id="viewStatus" class="notice">Preparing venue viewing screen...</p>
+      <div class="form-actions" style="margin-top:14px;">
+        <button type="button" id="connectViewBtn">Connect Screen</button>
+        <button type="button" id="refreshViewBtn">Refresh Schedule</button>
+      </div>
+    </div>
+
+    <div class="view-grid">
+      <div class="video-wall">
+        <h3 style="margin-top:0;">Live Room Feed</h3>
+        <div id="remoteFeeds"></div>
+      </div>
+
+      <div class="schedule-panel">
+        <h3 style="margin-top:0;">Room Schedule</h3>
+        <div id="roomMeta" class="notice">No room loaded.</div>
+        <div id="scheduleList" style="margin-top:14px;"></div>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNVenueShell.render("Venue Viewing Screen", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNVenueShell.venueNav();
+
+  let currentVenue = null;
+  let currentRoomSlug = "";
+
+  function setViewStatus(msg) {
+    document.getElementById("viewStatus").textContent = msg;
+  }
+
+  async function loadScheduleOnly() {
+    if (!currentVenue) currentVenue = await LinkdNVenueLive.getVenueForCurrentUser();
+    if (!currentVenue) throw new Error("No venue found.");
+
+    const state = await LinkdNVenueLive.getOrCreateLocalControlState(currentVenue.id);
+    currentRoomSlug = state.room_slug || "";
+    if (!currentRoomSlug) throw new Error("This venue is not linked to a room.");
+
+    const room = await LinkdNVenueLive.getRoomBySlug(currentRoomSlug);
+    if (!room) throw new Error("Linked room not found.");
+
+    document.getElementById("roomMeta").textContent = `${room.title} (${room.slug})`;
+
+    const schedule = await LinkdNVenueLive.getRoomSchedule(room.id);
+    document.getElementById("scheduleList").innerHTML = schedule.length
+      ? schedule.map(s => `
+          <div class="pill" style="display:block;margin-bottom:8px;">
+            <strong>${s.segment_title}</strong><br>
+            <span>${s.segment_type || "-"}</span>
+          </div>
+        `).join("")
+      : '<div class="notice">No schedule items found.</div>';
+
+    return room;
+  }
+
+  async function connectView() {
+    try {
+      const room = await loadScheduleOnly();
+
+      await LinkdNLiveKit.connect({
+        roomName: room.slug,
+        identity: `screen-${currentVenue.id}`,
+        name: `${currentVenue.name} Screen`,
+        metadata: JSON.stringify({ venueId: currentVenue.id, role: "venue_screen" })
+      });
+
+      const remoteFeeds = document.getElementById("remoteFeeds");
+      remoteFeeds.innerHTML = "";
+      await LinkdNLiveKit.attachRemoteTracks(remoteFeeds);
+
+      setViewStatus(`Viewing screen connected to ${room.slug}.`);
+    } catch (err) {
+      console.error(err);
+      setViewStatus(err.message || "Could not connect viewing screen.");
+    }
+  }
+
+  document.getElementById("connectViewBtn").addEventListener("click", connectView);
+  document.getElementById("refreshViewBtn").addEventListener("click", async () => {
+    try {
+      await loadScheduleOnly();
+      setViewStatus("Schedule refreshed.");
+    } catch (err) {
+      console.error(err);
+      setViewStatus(err.message || "Could not refresh schedule.");
+    }
+  });
+
+  (async function init() {
+    try {
+      currentVenue = await LinkdNVenueLive.getVenueForCurrentUser();
+      if (!currentVenue) throw new Error("No venue found for this account.");
+      await loadScheduleOnly();
+      LinkdNVenueShell.setStatus(`Viewing screen ready for ${currentVenue.name}`);
+      setViewStatus("Viewing screen ready.");
+    } catch (err) {
+      console.error(err);
+      LinkdNVenueShell.setStatus(err.message || "Could not initialize viewing screen.");
+      setViewStatus(err.message || "Could not initialize viewing screen.");
+    }
+  })();
+</script>
+</body>
+</html>
