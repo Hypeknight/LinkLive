@@ -1,51 +1,387 @@
 <!doctype html>
 <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Owner Venues</title>
-        <link rel="stylesheet" href="/common/app.css">
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-        <script src="/common/config.js"></script>
-        <script src="/common/supabase.js"></script>
-        <script src="/common/auth-live.js"></script>
-        <script src="/common/nav.js"></script>
-    </head>
-    <body>
-        <div class="page-wrap">
-            <div id="menu"></div>
-            <div class="form-card">
-                <h2>My Venues</h2>
-                <p id="status" class="notice">Loading...</p>
-            </div>
-            <div id="venues" class="feature-grid" style="margin-top:20px">
-                <!-- Venue cards will be populated here -->
-            </div>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner Venues</title>
+    <link rel="stylesheet" href="/common/app.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/common/config.js"></script>
+    <script src="/common/supabase.js"></script>
+    <script src="/common/auth-live.js"></script>
+    <script src="/common/nav.js"></script>
+    <style>
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        z-index: 1000;
+      }
+
+      .modal-backdrop.open {
+        display: flex;
+      }
+
+      .modal-card {
+        width: 100%;
+        max-width: 760px;
+        max-height: 90vh;
+        overflow-y: auto;
+        background: #0f1a30;
+        border: 1px solid #27416b;
+        border-radius: 16px;
+        padding: 22px;
+        box-sizing: border-box;
+      }
+
+      .top-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .venue-card-actions {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-wrap">
+      <div id="menu"></div>
+
+      <div class="form-card">
+        <div class="top-actions">
+          <div>
+            <h2 style="margin: 0;">My Venues</h2>
+            <p id="status" class="notice" style="margin-top: 12px;">Loading...</p>
+          </div>
+          <div>
+            <button type="button" id="openAddVenueBtn">Add Venue</button>
+          </div>
         </div>
-        <script>
-            const status = document.getElementById('status');
-            function setStatus(m) {
-                status.textContent = m;
-            }
-            async function init() {
-                try {
-                    menu.innerHTML = LinkdNNav.owner();
-                    const p = await LinkdNAuthLive.getProfile();
-                    if (!p) {
-                        location.href = '/auth/login.html';
-                        return;
-                    }
-                    const supabase = LinkdNSupabase.getClient();
-                    const { data, error } = await supabase.from('venues').select('*').eq('owner_profile_id', p.id).order('created_at', { ascending: false });
-                    if (error) throw error;
-                    venues.innerHTML = (data && data.length) ? data.map(v => `<div class="feature-card"><h3>${v.name}</h3><p><strong>Status:</strong> ${v.venue_status || 'pending_payment'}</p></div>`).join('') : '<div class="notice">No venues yet.</div>';
-                    setStatus('Venues loaded.');
-                } catch (err) {
-                    console.error(err);
-                    setStatus(err.message || 'Failed to load venues.');
-                }
-            }
-            init();
-        </script>
-    </body>
+      </div>
+
+      <div id="venues" class="feature-grid" style="margin-top:20px">
+        <!-- Venue cards will be populated here -->
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="venueModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="top-actions" style="margin-bottom: 14px;">
+          <h2 id="venueModalTitle" style="margin: 0;">Add Venue</h2>
+          <button type="button" id="closeVenueModalBtn">Close</button>
+        </div>
+
+        <form id="venueForm">
+          <input type="hidden" id="venue_id">
+
+          <label>Venue Name</label>
+          <input id="venue_name" required>
+
+          <label style="margin-top:14px;">Street Address</label>
+          <input id="street_address" required>
+
+          <div class="form-row" style="margin-top:14px;">
+            <div>
+              <label>City</label>
+              <input id="venue_city" required>
+            </div>
+            <div>
+              <label>State</label>
+              <input id="venue_state" maxlength="2" required>
+            </div>
+          </div>
+
+          <label style="margin-top:14px;">ZIP</label>
+          <input id="venue_zip" required>
+
+          <div class="form-row" style="margin-top:14px;">
+            <div>
+              <label>During Hours Contact Name</label>
+              <input id="during_hours_contact_name" required>
+            </div>
+            <div>
+              <label>During Hours Contact Phone</label>
+              <input id="during_hours_contact_phone" required>
+            </div>
+          </div>
+
+          <label style="margin-top:14px;">Active Email</label>
+          <input id="active_email" type="email" required>
+
+          <label style="margin-top:14px;">Description</label>
+          <textarea id="description"></textarea>
+
+          <div class="notice" style="margin-top:14px;">
+            Slug is created automatically from venue name, city, and state.
+          </div>
+
+          <div class="form-actions" style="margin-top:16px;">
+            <button type="submit" id="saveVenueBtn">Save Venue</button>
+            <button type="button" id="cancelVenueBtn">Cancel</button>
+          </div>
+        </form>
+
+        <p id="modalStatus" class="notice" style="display:none; margin-top:14px;"></p>
+      </div>
+    </div>
+
+    <script>
+      const status = document.getElementById('status');
+      const venuesEl = document.getElementById('venues');
+      const menuEl = document.getElementById('menu');
+      const venueModal = document.getElementById('venueModal');
+      const venueModalTitle = document.getElementById('venueModalTitle');
+      const modalStatus = document.getElementById('modalStatus');
+      const venueForm = document.getElementById('venueForm');
+
+      let currentProfile = null;
+
+      function setStatus(message) {
+        status.textContent = message;
+      }
+
+      function setModalStatus(message, show = true) {
+        modalStatus.textContent = message;
+        modalStatus.style.display = show ? 'block' : 'none';
+      }
+
+      function getValue(id) {
+        const el = document.getElementById(id);
+        if (!el) throw new Error(`Missing form field: ${id}`);
+        return (el.value || '').trim();
+      }
+
+      function makeSlug(name, city, state) {
+        return [name, city, state]
+          .filter(Boolean)
+          .join('-')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .replace(/-{2,}/g, '-');
+      }
+
+      function openVenueModal(mode = 'add', venue = null) {
+        venueModal.classList.add('open');
+        setModalStatus('', false);
+
+        if (mode === 'edit' && venue) {
+          venueModalTitle.textContent = 'Edit Venue';
+          document.getElementById('venue_id').value = venue.id || '';
+          document.getElementById('venue_name').value = venue.name || '';
+          document.getElementById('street_address').value = venue.street_address || '';
+          document.getElementById('venue_city').value = venue.city || '';
+          document.getElementById('venue_state').value = venue.state || '';
+          document.getElementById('venue_zip').value = venue.zip || '';
+          document.getElementById('during_hours_contact_name').value = venue.during_hours_contact_name || '';
+          document.getElementById('during_hours_contact_phone').value = venue.during_hours_contact_phone || '';
+          document.getElementById('active_email').value = venue.active_email || '';
+          document.getElementById('description').value = venue.description || '';
+        } else {
+          venueModalTitle.textContent = 'Add Venue';
+          venueForm.reset();
+          document.getElementById('venue_id').value = '';
+        }
+      }
+
+      function closeVenueModal() {
+        venueModal.classList.remove('open');
+        venueForm.reset();
+        document.getElementById('venue_id').value = '';
+        setModalStatus('', false);
+      }
+
+      async function loadVenues() {
+        const supabase = LinkdNSupabase.getClient();
+        const { data, error } = await supabase
+          .from('venues')
+          .select('*')
+          .eq('owner_profile_id', currentProfile.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || !data.length) {
+          venuesEl.innerHTML = '<div class="notice">No venues yet.</div>';
+          return;
+        }
+
+        venuesEl.innerHTML = data.map(v => `
+          <div class="feature-card">
+            <h3>${v.name}</h3>
+            <p><strong>Status:</strong> ${v.venue_status || 'pending_payment'}</p>
+            <p><strong>Address:</strong> ${v.street_address || '-'}, ${v.city || '-'}, ${v.state || '-'} ${v.zip || ''}</p>
+            <p><strong>Email:</strong> ${v.active_email || '-'}</p>
+            <div class="venue-card-actions">
+              <button type="button" onclick="window.editVenue('${v.id}')">Edit</button>
+            </div>
+          </div>
+        `).join('');
+
+        window.__ownerVenues = data;
+      }
+
+      window.editVenue = function (venueId) {
+        const venue = (window.__ownerVenues || []).find(v => v.id === venueId);
+        if (!venue) return;
+        openVenueModal('edit', venue);
+      };
+
+      async function saveVenue(e) {
+        e.preventDefault();
+        setModalStatus('Saving venue...');
+
+        try {
+          const supabase = LinkdNSupabase.getClient();
+
+          const venueId = getValue('venue_id');
+          const name = getValue('venue_name');
+          const street_address = getValue('street_address');
+          const city = getValue('venue_city');
+          const state = getValue('venue_state').toUpperCase();
+          const zip = getValue('venue_zip');
+          const during_hours_contact_name = getValue('during_hours_contact_name');
+          const during_hours_contact_phone = getValue('during_hours_contact_phone');
+          const active_email = getValue('active_email');
+          const description = getValue('description');
+          const slug = makeSlug(name, city, state);
+
+          const payload = {
+            owner_profile_id: currentProfile.id,
+            slug,
+            name,
+            street_address,
+            city,
+            state,
+            zip,
+            during_hours_contact_name,
+            during_hours_contact_phone,
+            active_email,
+            description
+          };
+
+          let venueRecord = null;
+
+          if (venueId) {
+            const { data, error } = await supabase
+              .from('venues')
+              .update(payload)
+              .eq('id', venueId)
+              .select()
+              .single();
+
+            if (error) throw error;
+            venueRecord = data;
+          } else {
+            const { data, error } = await supabase
+              .from('venues')
+              .insert({
+                ...payload,
+                searchable: false,
+                venue_status: 'pending_payment',
+                active: true
+              })
+              .select()
+              .single();
+
+            if (error) throw error;
+            venueRecord = data;
+
+            const { error: billingError } = await supabase
+              .from('venue_billing')
+              .insert({
+                venue_id: venueRecord.id,
+                billing_status: 'pending_payment',
+                current_plan: 'starter',
+                amount_due: 0,
+                amount_paid: 0
+              });
+
+            if (billingError) throw billingError;
+
+            const { error: settingsError } = await supabase
+              .from('venue_settings')
+              .insert({
+                venue_id: venueRecord.id
+              });
+
+            if (settingsError) throw settingsError;
+
+            const { error: metricsError } = await supabase
+              .from('venue_metrics')
+              .insert({
+                venue_id: venueRecord.id
+              });
+
+            if (metricsError) throw metricsError;
+
+            const { error: workerError } = await supabase
+              .from('venue_workers')
+              .insert({
+                venue_id: venueRecord.id,
+                profile_id: currentProfile.id,
+                access_level: 'high',
+                active: true,
+                assigned_by: currentProfile.id
+              });
+
+            if (workerError) throw workerError;
+          }
+
+          setModalStatus('Venue saved successfully.');
+          await loadVenues();
+          setStatus('Venues loaded.');
+
+          setTimeout(() => {
+            closeVenueModal();
+          }, 500);
+        } catch (err) {
+          console.error(err);
+          setModalStatus(err.message || 'Could not save venue.');
+        }
+      }
+
+      async function init() {
+        try {
+          menuEl.innerHTML = LinkdNNav.owner();
+          const p = await LinkdNAuthLive.getProfile();
+
+          if (!p) {
+            location.href = '/auth/login.html';
+            return;
+          }
+
+          currentProfile = p;
+          await loadVenues();
+          setStatus('Venues loaded.');
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message || 'Failed to load venues.');
+        }
+      }
+
+      document.getElementById('openAddVenueBtn').addEventListener('click', () => openVenueModal('add'));
+      document.getElementById('closeVenueModalBtn').addEventListener('click', closeVenueModal);
+      document.getElementById('cancelVenueBtn').addEventListener('click', closeVenueModal);
+      venueForm.addEventListener('submit', saveVenue);
+
+      venueModal.addEventListener('click', (e) => {
+        if (e.target === venueModal) closeVenueModal();
+      });
+
+      init();
+    </script>
+  </body>
 </html>
