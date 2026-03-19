@@ -203,6 +203,16 @@
         setModalStatus('', false);
       }
 
+      function selectVenueAndGo(venueId) {
+        const venue = (window.__ownerVenues || []).find(v => v.id === venueId);
+        if (!venue) return;
+
+        localStorage.setItem('linkdn_selected_venue_id', venue.id);
+        localStorage.setItem('linkdn_selected_venue_name', venue.name || '');
+        localStorage.setItem('linkdn_selected_venue_status', venue.venue_status || '');
+        location.href = '/venue/dashboard.html';
+      }
+
       async function loadVenues() {
         const supabase = LinkdNSupabase.getClient();
         const { data, error } = await supabase
@@ -213,10 +223,14 @@
 
         if (error) throw error;
 
+        window.__ownerVenues = data || [];
+
         if (!data || !data.length) {
           venuesEl.innerHTML = '<div class="notice">No venues yet.</div>';
           return;
         }
+
+        const selectedVenueId = localStorage.getItem('linkdn_selected_venue_id');
 
         venuesEl.innerHTML = data.map(v => `
           <div class="feature-card">
@@ -224,19 +238,23 @@
             <p><strong>Status:</strong> ${v.venue_status || 'pending_payment'}</p>
             <p><strong>Address:</strong> ${v.street_address || '-'}, ${v.city || '-'}, ${v.state || '-'} ${v.zip || ''}</p>
             <p><strong>Email:</strong> ${v.active_email || '-'}</p>
+            <p><strong>Selected:</strong> ${selectedVenueId === v.id ? 'Yes' : 'No'}</p>
             <div class="venue-card-actions">
               <button type="button" onclick="window.editVenue('${v.id}')">Edit</button>
+              <button type="button" onclick="window.openVenueDashboard('${v.id}')">Open Venue Dashboard</button>
             </div>
           </div>
         `).join('');
-
-        window.__ownerVenues = data;
       }
 
       window.editVenue = function (venueId) {
         const venue = (window.__ownerVenues || []).find(v => v.id === venueId);
         if (!venue) return;
         openVenueModal('edit', venue);
+      };
+
+      window.openVenueDashboard = function (venueId) {
+        selectVenueAndGo(venueId);
       };
 
       async function saveVenue(e) {
