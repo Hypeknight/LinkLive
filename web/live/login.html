@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | Live Venue Control</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/assets/js/config.js"></script>
+  <script src="/assets/js/supabase.js"></script>
+  <script src="/assets/js/common.js"></script>
+  <script src="/assets/js/auth.js"></script>
+</head>
+<body class="auth-page">
+  <main class="auth-wrap">
+    <section class="auth-card">
+      <div class="brand-row"><span class="brand-mark"></span><div><h1 data-app-name></h1><p>Sign in to the moderator or venue experience.</p></div></div>
+      <div class="badge-row">Venue: <strong data-venue-name></strong> · <span data-venue-id></span></div>
+      <div id="flash-host"></div>
+      <form id="login-form" class="stack">
+        <label>Email<input type="email" name="email" required></label>
+        <label>Password<input type="password" name="password" required></label>
+        <button type="submit">Sign In</button>
+      </form>
+      <div class="helper">This login expects Supabase Auth plus a <code>profiles</code> row with a role.</div>
+      <div id="connection-state" class="connection offline"></div>
+    </section>
+  </main>
+  <script>document.addEventListener('DOMContentLoaded', () => window.LiveAuth.bootLogin());</script>
+</body>
+</html>
