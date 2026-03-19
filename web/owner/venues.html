@@ -1,1 +1,51 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Owner Venues</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="form-card"><h2>Create / Edit Venue</h2><form id="f"><input type="hidden" id="venue_id"><label>Name</label><input id="name" required><label style="margin-top:14px">Street Address</label><input id="street_address"><div class="form-row" style="margin-top:14px"><div><label>City</label><input id="city"></div><div><label>State</label><input id="state" maxlength="2"></div></div><div class="form-row" style="margin-top:14px"><div><label>Zip</label><input id="zip"></div><div><label>Active Email</label><input id="active_email" type="email"></div></div><label style="margin-top:14px">During Hours Contact Name</label><input id="during_hours_contact_name"><label style="margin-top:14px">During Hours Contact Phone</label><input id="during_hours_contact_phone"><label style="margin-top:14px">Description</label><textarea id="description"></textarea><div class="form-actions"><button type="submit">Save Venue</button><button type="button" id="resetBtn">Clear</button></div></form><p id="s" class="notice" style="display:none;margin-top:14px"></p></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Address</th><th>Status</th><th>Actions</th></tr></thead><tbody id="tb"></tbody></table></div></div><script>menu.innerHTML=LinkdNNav.owner();let me;function slugify(name,city,state){return [name,city,state].filter(Boolean).join('-').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').replace(/-{2,}/g,'-')}function msg(t){s.style.display='block';s.textContent=t}function resetForm(){venue_id.value='';name.value='';street_address.value='';city.value='';state.value='';zip.value='';active_email.value='';during_hours_contact_name.value='';during_hours_contact_phone.value='';description.value='';}async function load(){me=await LinkdNAuthLive.getProfile();if(!me){location.href='/auth/login.html';return}const supabase=LinkdNSupabase.getClient();const {data,error}=await supabase.from('venues').select('*').eq('owner_profile_id',me.id).order('created_at',{ascending:false});if(error){msg(error.message);return}tb.innerHTML=(data&&data.length)?data.map(v=>`<tr><td>${v.name}</td><td>${v.street_address||''} ${v.city||''}, ${v.state||''} ${v.zip||''}</td><td>${v.venue_status}</td><td><button type="button" onclick='editVenue(${JSON.stringify(v).replace(/'/g,'&apos;')})'>Edit</button></td></tr>`).join(''):'<tr><td colspan="4">No venues yet.</td></tr>';}window.editVenue=(v)=>{venue_id.value=v.id||'';name.value=v.name||'';street_address.value=v.street_address||'';city.value=v.city||'';state.value=v.state||'';zip.value=v.zip||'';active_email.value=v.active_email||'';during_hours_contact_name.value=v.during_hours_contact_name||'';during_hours_contact_phone.value=v.during_hours_contact_phone||'';description.value=v.description||'';window.scrollTo({top:0,behavior:'smooth'});};f.addEventListener('submit',async e=>{e.preventDefault();msg('Saving...');try{const supabase=LinkdNSupabase.getClient();const payload={owner_profile_id:me.id,name:name.value.trim(),slug:slugify(name.value.trim(),city.value.trim(),state.value.trim().toUpperCase()),street_address:street_address.value.trim(),city:city.value.trim(),state:state.value.trim().toUpperCase(),zip:zip.value.trim(),active_email:active_email.value.trim(),during_hours_contact_name:during_hours_contact_name.value.trim(),during_hours_contact_phone:during_hours_contact_phone.value.trim(),description:description.value.trim(),venue_status:'pending_payment'};let result;if(venue_id.value){result=await supabase.from('venues').update(payload).eq('id',venue_id.value)}else{result=await supabase.from('venues').insert(payload).select().single();if(!result.error&&result.data){await supabase.from('venue_billing').upsert({venue_id:result.data.id,billing_status:'pending_payment',current_plan:'starter'});await supabase.from('venue_settings').upsert({venue_id:result.data.id});await supabase.from('venue_metrics').upsert({venue_id:result.data.id});}}if(result.error) throw result.error;msg('Venue saved.');resetForm();load();}catch(err){console.error(err);msg(err.message||'Save failed.')}});resetBtn.addEventListener('click',resetForm);load();</script></body></html>
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Owner Venues</title>
+        <link rel="stylesheet" href="/common/app.css">
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="/common/config.js"></script>
+        <script src="/common/supabase.js"></script>
+        <script src="/common/auth-live.js"></script>
+        <script src="/common/nav.js"></script>
+    </head>
+    <body>
+        <div class="page-wrap">
+            <div id="menu"></div>
+            <div class="form-card">
+                <h2>My Venues</h2>
+                <p id="status" class="notice">Loading...</p>
+            </div>
+            <div id="venues" class="feature-grid" style="margin-top:20px">
+                <!-- Venue cards will be populated here -->
+            </div>
+        </div>
+        <script>
+            const status = document.getElementById('status');
+            function setStatus(m) {
+                status.textContent = m;
+            }
+            async function init() {
+                try {
+                    menu.innerHTML = LinkdNNav.owner();
+                    const p = await LinkdNAuthLive.getProfile();
+                    if (!p) {
+                        location.href = '/auth/login.html';
+                        return;
+                    }
+                    const supabase = LinkdNSupabase.getClient();
+                    const { data, error } = await supabase.from('venues').select('*').eq('owner_profile_id', p.id).order('created_at', { ascending: false });
+                    if (error) throw error;
+                    venues.innerHTML = (data && data.length) ? data.map(v => `<div class="feature-card"><h3>${v.name}</h3><p><strong>Status:</strong> ${v.venue_status || 'pending_payment'}</p></div>`).join('') : '<div class="notice">No venues yet.</div>';
+                    setStatus('Venues loaded.');
+                } catch (err) {
+                    console.error(err);
+                    setStatus(err.message || 'Failed to load venues.');
+                }
+            }
+            init();
+        </script>
+    </body>
+</html>
