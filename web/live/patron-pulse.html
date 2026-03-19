@@ -3,56 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Patron Pulse</title>
+  <title>Patron Pulse | Live Venue Control</title>
   <link rel="stylesheet" href="assets/css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js"></script>
+  <script defer src="assets/js/app.js"></script>
 </head>
-<body data-page="pulse">
-  <header>
-    <div class="topbar">
-      <div class="brand">Live Venue Control <small data-venue></small></div>
-      <div class="badge"><span data-mode></span></div>
-    </div>
-    <nav>
-      <a href="index.html">Dashboard</a>
-      <a href="ops.html">Ops</a>
-      <a href="rooms.html">Rooms</a>
-      <a href="scheduling.html">Scheduling</a>
-      <a href="patron-pulse.html">Patron Pulse</a>
-      <a href="local-controls.html">Local Controls</a>
-      <a href="device-settings.html">Device Settings</a>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">Live Venue Control</div>
+    <div class="sub">Moderator + live operations stack</div>
+    <div class="badge">Venue: <span id="venue-badge"></span></div>
+    <nav class="nav">
+      <a href="index.html" >Show Dashboard</a>
+      <a href="rooms.html" >Rooms</a>
+      <a href="scheduling.html" >Scheduling</a>
+      <a href="ops.html" >Ops</a>
+      <a href="patron-pulse.html" class="active">Patron Pulse</a>
+      <a href="local-controls.html" >Local Controls</a>
+      <a href="device-settings.html" >Device Settings</a>
     </nav>
-  </header>
-  <main>
-    
-<section class="grid">
-  <div class="card span-5">
-    <h2>Log Patron Pulse</h2>
-    <form id="pulseForm">
-      <label>Room</label><select id="pulseRoomId" name="room_id"></select>
-      <div class="row">
-        <div class="col-4"><label>Pulse Score</label><input type="number" name="pulse_score" min="0" max="100" value="75"></div>
-        <div class="col-4"><label>Crowd Count</label><input type="number" name="crowd_count" min="0" value="0"></div>
-        <div class="col-4"><label>Energy 1-10</label><input type="number" name="energy_level" min="1" max="10" value="7"></div>
+  </aside>
+  <main class="main">
+    <div class="header">
+      <div class="title">
+        <h1>Patron Pulse</h1>
+        <p>Log crowd energy and room sentiment from the moderator or floor team side.</p>
       </div>
-      <label>Source</label><select name="source"><option selected>manual</option><option>camera</option><option>sales</option><option>sensor</option></select>
-      <label>Notes</label><textarea name="notes"></textarea>
-      <button class="btn primary" type="submit">Save Pulse</button>
+      <div class="meta">
+        <div id="connection-state" class="connection offline"></div>
+      </div>
+    </div>
+    <div id="flash-host" class="flash-host"></div>
+    <section data-page="pulse" class="two-up">
+  <div class="card">
+    <h3>Submit Pulse</h3>
+    <form id="pulse-form">
+      <label>Room<select name="room_id" id="pulse-room-id"></select></label>
+      <label>Pulse score (0-100)<input name="pulse_score" type="number" min="0" max="100" value="70" required></label>
+      <label>Crowd count<input name="crowd_count" type="number" min="0" value="0" required></label>
+      <label>Energy level (1-10)<input name="energy_level" type="number" min="1" max="10" value="5" required></label>
+      <label>Source<select name="source"><option value="manual">Manual</option><option value="moderator">Moderator</option><option value="floor">Floor</option></select></label>
+      <label>Notes<textarea name="notes"></textarea></label>
+      <div class="button-row"><button type="submit">Save Pulse</button></div>
     </form>
   </div>
-  <div class="card span-7">
-    <h2>Pulse History</h2>
-    <div class="table-wrap"><table><thead><tr><th>Time</th><th>Room</th><th>Pulse</th><th>Crowd</th><th>Energy</th><th>Source</th></tr></thead><tbody id="pulseBody"></tbody></table></div>
+  <div class="card">
+    <h3>Pulse Feed</h3>
+    <table>
+      <thead><tr><th>Room</th><th>Pulse</th><th>Crowd</th><th>Energy</th><th>Source</th><th>Notes</th><th>Created</th></tr></thead>
+      <tbody id="pulse-table"></tbody>
+    </table>
   </div>
 </section>
-
   </main>
-  <script>
-    const links = [...document.querySelectorAll('nav a')];
-    const current = location.pathname.split('/').pop() || 'index.html';
-    links.forEach(a => { if (a.getAttribute('href') === current) a.classList.add('active'); });
-  </script>
+</div>
+
 </body>
 </html>

@@ -3,54 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Local Controls</title>
+  <title>Local Controls | Live Venue Control</title>
   <link rel="stylesheet" href="assets/css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js"></script>
+  <script defer src="assets/js/app.js"></script>
 </head>
-<body data-page="controls">
-  <header>
-    <div class="topbar">
-      <div class="brand">Live Venue Control <small data-venue></small></div>
-      <div class="badge"><span data-mode></span></div>
-    </div>
-    <nav>
-      <a href="index.html">Dashboard</a>
-      <a href="ops.html">Ops</a>
-      <a href="rooms.html">Rooms</a>
-      <a href="scheduling.html">Scheduling</a>
-      <a href="patron-pulse.html">Patron Pulse</a>
-      <a href="local-controls.html">Local Controls</a>
-      <a href="device-settings.html">Device Settings</a>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">Live Venue Control</div>
+    <div class="sub">Moderator + live operations stack</div>
+    <div class="badge">Venue: <span id="venue-badge"></span></div>
+    <nav class="nav">
+      <a href="index.html" >Show Dashboard</a>
+      <a href="rooms.html" >Rooms</a>
+      <a href="scheduling.html" >Scheduling</a>
+      <a href="ops.html" >Ops</a>
+      <a href="patron-pulse.html" >Patron Pulse</a>
+      <a href="local-controls.html" class="active">Local Controls</a>
+      <a href="device-settings.html" >Device Settings</a>
     </nav>
-  </header>
-  <main>
-    
-<section class="grid">
-  <div class="card span-5">
-    <h2>Local Camera/Mic Controls</h2>
-    <label>Room</label><select id="controlRoomId"></select>
-    <label>Camera Input</label><select id="localCamId"></select>
-    <label>Microphone Input</label><select id="localMicId"></select>
-    <button id="startPreviewBtn" class="btn primary" type="button">Start Preview</button>
-    <button id="stopPreviewBtn" class="btn" type="button">Stop Preview</button>
-    <button id="saveLocalMapBtn" class="btn" type="button">Map Devices to Room</button>
-    <p id="previewStatus" class="muted small">Preview idle</p>
-    <hr>
-    <p class="small muted">Use this page on the local machine that has the show camera and mic attached. Most browsers require HTTPS or localhost for media access.</p>
+  </aside>
+  <main class="main">
+    <div class="header">
+      <div class="title">
+        <h1>Local Controls</h1>
+        <p>Preview the local camera and mic, sync browser devices, and map them to a room.</p>
+      </div>
+      <div class="meta">
+        <div id="connection-state" class="connection offline"></div>
+      </div>
+    </div>
+    <div id="flash-host" class="flash-host"></div>
+    <section data-page="local-controls" class="grid cols-2">
+  <div class="card">
+    <h3>Local Preview</h3>
+    <div class="button-row" style="margin-bottom:12px;"><button type="button" id="request-media">Request Camera + Mic Access</button><button type="button" id="start-preview" class="secondary">Start Preview</button><button type="button" id="stop-preview" class="secondary">Stop Preview</button></div>
+    <label>Camera device<select id="local-camera-device"></select></label>
+    <label>Microphone device<select id="local-mic-device"></select></label>
+    <video id="local-video" class="preview" autoplay muted playsinline></video>
+    <p id="stream-info" class="helper">Preview is idle.</p>
   </div>
-  <div class="card span-7">
-    <h2>Preview</h2>
-    <video id="previewVideo" autoplay muted playsinline></video>
+  <div class="card">
+    <h3>Room Mapping</h3>
+    <label>Room<select id="local-room-id"></select></label>
+    <div class="button-row" style="margin:12px 0 18px;"><button type="button" id="map-devices">Map Devices To Room + Set Live</button></div>
+    <table>
+      <thead><tr><th>Room</th><th>Camera</th><th>Mic</th><th>Status</th></tr></thead>
+      <tbody id="local-map-table"></tbody>
+    </table>
   </div>
 </section>
-
   </main>
-  <script>
-    const links = [...document.querySelectorAll('nav a')];
-    const current = location.pathname.split('/').pop() || 'index.html';
-    links.forEach(a => { if (a.getAttribute('href') === current) a.classList.add('active'); });
-  </script>
+</div>
+
 </body>
 </html>

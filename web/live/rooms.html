@@ -3,66 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rooms</title>
+  <title>Rooms | Live Venue Control</title>
   <link rel="stylesheet" href="assets/css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js"></script>
+  <script defer src="assets/js/app.js"></script>
 </head>
-<body data-page="rooms">
-  <header>
-    <div class="topbar">
-      <div class="brand">Live Venue Control <small data-venue></small></div>
-      <div class="badge"><span data-mode></span></div>
-    </div>
-    <nav>
-      <a href="index.html">Dashboard</a>
-      <a href="ops.html">Ops</a>
-      <a href="rooms.html">Rooms</a>
-      <a href="scheduling.html">Scheduling</a>
-      <a href="patron-pulse.html">Patron Pulse</a>
-      <a href="local-controls.html">Local Controls</a>
-      <a href="device-settings.html">Device Settings</a>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">Live Venue Control</div>
+    <div class="sub">Moderator + live operations stack</div>
+    <div class="badge">Venue: <span id="venue-badge"></span></div>
+    <nav class="nav">
+      <a href="index.html" >Show Dashboard</a>
+      <a href="rooms.html" class="active">Rooms</a>
+      <a href="scheduling.html" >Scheduling</a>
+      <a href="ops.html" >Ops</a>
+      <a href="patron-pulse.html" >Patron Pulse</a>
+      <a href="local-controls.html" >Local Controls</a>
+      <a href="device-settings.html" >Device Settings</a>
     </nav>
-  </header>
-  <main>
-    
-<section class="grid">
-  <div class="card span-5">
-    <h2>Create Room</h2>
-    <form id="roomForm">
-      <label>Room Name</label><input name="name" required>
-      <div class="row">
-        <div class="col-6"><label>Zone</label><input name="zone" placeholder="North / VIP / Main"></div>
-        <div class="col-6"><label>Capacity</label><input type="number" name="capacity" min="0"></div>
+  </aside>
+  <main class="main">
+    <div class="header">
+      <div class="title">
+        <h1>Rooms</h1>
+        <p>Create rooms, assign devices, update room status, and keep the live dashboard synchronized.</p>
       </div>
-      <label>Status</label><select name="status"><option selected>active</option><option>inactive</option><option>maintenance</option></select>
-      <label>Notes</label><textarea name="notes"></textarea>
-      <button class="btn primary" type="submit">Save Room</button>
+      <div class="meta">
+        <div id="connection-state" class="connection offline"></div>
+      </div>
+    </div>
+    <div id="flash-host" class="flash-host"></div>
+    <section data-page="rooms" class="two-up">
+  <div class="card">
+    <h3 id="room-form-title">Add Room</h3>
+    <form id="room-form">
+      <label>Room name<input name="name" required></label>
+      <label>Zone<input name="zone" placeholder="A / B / Main / Patio"></label>
+      <label>Capacity<input name="capacity" type="number" min="0" value="0"></label>
+      <label>Status<select name="status"><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label>
+      <label>Assigned camera<select name="assigned_camera_id" id="assigned_camera_id"></select></label>
+      <label>Assigned microphone<select name="assigned_mic_id" id="assigned_mic_id"></select></label>
+      <div class="button-row"><button type="submit">Save Room</button><button id="room-form-reset" type="button" class="secondary">Reset</button></div>
     </form>
   </div>
-  <div class="card span-7">
-    <h2>Assign Camera/Mic to Room</h2>
-    <form id="assignForm">
-      <label>Room</label><select id="assignRoomId" name="room_id"></select>
-      <label>Camera</label><select id="assignCameraId" name="assigned_camera_id"></select>
-      <label>Microphone</label><select id="assignMicId" name="assigned_mic_id"></select>
-      <div id="assignHint" class="muted small">Choose a room and assign devices.</div>
-      <br>
-      <button class="btn primary" type="submit">Save Assignment</button>
-    </form>
-  </div>
-  <div class="card span-12">
-    <h2>Rooms</h2>
-    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Zone</th><th>Capacity</th><th>Status</th><th>Camera</th><th>Mic</th><th>Actions</th></tr></thead><tbody id="roomsBody"></tbody></table></div>
+  <div class="card">
+    <h3>Current Rooms</h3>
+    <table>
+      <thead><tr><th>Name</th><th>Zone</th><th>Capacity</th><th>Status</th><th>Camera</th><th>Mic</th><th>Actions</th></tr></thead>
+      <tbody id="rooms-table"></tbody>
+    </table>
   </div>
 </section>
-
   </main>
-  <script>
-    const links = [...document.querySelectorAll('nav a')];
-    const current = location.pathname.split('/').pop() || 'index.html';
-    links.forEach(a => { if (a.getAttribute('href') === current) a.classList.add('active'); });
-  </script>
+</div>
+
 </body>
 </html>

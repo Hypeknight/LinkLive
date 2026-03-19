@@ -3,59 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scheduling</title>
+  <title>Scheduling | Live Venue Control</title>
   <link rel="stylesheet" href="assets/css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js"></script>
+  <script defer src="assets/js/app.js"></script>
 </head>
-<body data-page="scheduling">
-  <header>
-    <div class="topbar">
-      <div class="brand">Live Venue Control <small data-venue></small></div>
-      <div class="badge"><span data-mode></span></div>
-    </div>
-    <nav>
-      <a href="index.html">Dashboard</a>
-      <a href="ops.html">Ops</a>
-      <a href="rooms.html">Rooms</a>
-      <a href="scheduling.html">Scheduling</a>
-      <a href="patron-pulse.html">Patron Pulse</a>
-      <a href="local-controls.html">Local Controls</a>
-      <a href="device-settings.html">Device Settings</a>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">Live Venue Control</div>
+    <div class="sub">Moderator + live operations stack</div>
+    <div class="badge">Venue: <span id="venue-badge"></span></div>
+    <nav class="nav">
+      <a href="index.html" >Show Dashboard</a>
+      <a href="rooms.html" >Rooms</a>
+      <a href="scheduling.html" class="active">Scheduling</a>
+      <a href="ops.html" >Ops</a>
+      <a href="patron-pulse.html" >Patron Pulse</a>
+      <a href="local-controls.html" >Local Controls</a>
+      <a href="device-settings.html" >Device Settings</a>
     </nav>
-  </header>
-  <main>
-    
-<section class="grid">
-  <div class="card span-5">
-    <h2>Create Schedule Item</h2>
-    <form id="scheduleForm">
-      <label>Title</label><input name="title" required>
-      <label>Room</label><select id="scheduleRoomId" name="room_id"></select>
-      <div class="row">
-        <div class="col-6"><label>Start</label><input type="datetime-local" name="start_at" required></div>
-        <div class="col-6"><label>End</label><input type="datetime-local" name="end_at" required></div>
+  </aside>
+  <main class="main">
+    <div class="header">
+      <div class="title">
+        <h1>Scheduling</h1>
+        <p>Manage show blocks and room timing from the moderator side.</p>
       </div>
-      <div class="row">
-        <div class="col-6"><label>Status</label><select name="status"><option selected>scheduled</option><option>live</option><option>completed</option><option>cancelled</option></select></div>
-        <div class="col-6"><label>Lead</label><input name="lead_name"></div>
+      <div class="meta">
+        <div id="connection-state" class="connection offline"></div>
       </div>
-      <label>Notes</label><textarea name="notes"></textarea>
-      <button class="btn primary" type="submit">Save Schedule</button>
+    </div>
+    <div id="flash-host" class="flash-host"></div>
+    <section data-page="scheduling" class="two-up">
+  <div class="card">
+    <h3 id="schedule-form-title">Add Schedule</h3>
+    <form id="schedule-form">
+      <label>Title<input name="title" required></label>
+      <label>Room<select name="room_id" id="schedule-room-id"></select></label>
+      <label>Start<input name="start_at" type="datetime-local" required></label>
+      <label>End<input name="end_at" type="datetime-local"></label>
+      <label>Lead name<input name="lead_name"></label>
+      <label>Status<select name="status"><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label>
+      <div class="button-row"><button type="submit">Save Schedule</button><button id="schedule-form-reset" type="button" class="secondary">Reset</button></div>
     </form>
   </div>
-  <div class="card span-7">
-    <h2>Schedule Board</h2>
-    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Room</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody id="scheduleBody"></tbody></table></div>
+  <div class="card">
+    <h3>Schedule Board</h3>
+    <table>
+      <thead><tr><th>Title</th><th>Room</th><th>Start</th><th>End</th><th>Lead</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="schedule-table"></tbody>
+    </table>
   </div>
 </section>
-
   </main>
-  <script>
-    const links = [...document.querySelectorAll('nav a')];
-    const current = location.pathname.split('/').pop() || 'index.html';
-    links.forEach(a => { if (a.getAttribute('href') === current) a.classList.add('active'); });
-  </script>
+</div>
+
 </body>
 </html>
