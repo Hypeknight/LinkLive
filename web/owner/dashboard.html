@@ -1,1 +1,72 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Owner Dashboard</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="form-card"><h2>Owner Dashboard</h2><p id="status" class="notice">Loading...</p></div><div class="feature-grid" style="margin-top:20px"><div class="feature-card"><h3>Profile</h3><p><strong>Name:</strong> <span id="n">-</span></p><p><strong>Email:</strong> <span id="e">-</span></p><p><strong>Role:</strong> <span id="r">-</span></p></div><div class="feature-card"><h3>My Venues</h3><div id="venues">Loading...</div></div><div class="feature-card"><h3>Quick Actions</h3><div class="form-actions" style="flex-direction:column"><a href="/owner/profile.html"><button type="button">Edit Profile</button></a><a href="/owner/venues.html"><button type="button">Manage Venues</button></a><a href="/owner/workers.html"><button type="button">Workers</button></a><a href="/owner/billing.html"><button type="button">Billing</button></a></div></div></div></div><script>const status=document.getElementById('status');function setStatus(m){status.textContent=m}async function init(){try{menu.innerHTML=LinkdNNav.owner();const p=await LinkdNAuthLive.getProfile();if(!p){location.href='/auth/login.html';return}n.textContent=p.display_name||'-';e.textContent=p.email||'-';r.textContent=p.role||'-';const supabase=LinkdNSupabase.getClient();const {data,error}=await supabase.from('venues').select('*').eq('owner_profile_id',p.id).order('created_at',{ascending:false});if(error) throw error;venues.innerHTML=(data&&data.length)?data.map(v=>`<div class="pill">${v.name} (${v.venue_status||'pending_payment'})</div>`).join(''):'<div class="notice">No venues yet.</div>';setStatus('Dashboard loaded.')}catch(err){console.error(err);setStatus(err.message||'Failed to load dashboard.')}}</script></body></html>
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Owner Dashboard</title>
+        <link rel="stylesheet" href="/common/app.css">
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="/common/config.js"></script>
+        <script src="/common/supabase.js"></script>
+        <script src="/common/auth-live.js"></script>
+        <script src="/common/nav.js"></script>
+    </head>
+    <body>
+        <div class="page-wrap">
+            <div id="menu"></div>
+            <div class="form-card">
+                <h2>Owner Dashboard</h2>
+                <p id="status" class="notice">Loading...</p>
+            </div>
+            <div class="feature-grid" style="margin-top:20px">
+                <div class="feature-card">
+                    <h3>Profile</h3>
+                    <p><strong>Name:</strong> <span id="n">-</span></p>
+                    <p><strong>Email:</strong> <span id="e">-</span></p>
+                    <p><strong>Role:</strong> <span id="r">-</span></p>
+                </div>
+                <div class="feature-card">
+                    <h3>My Venues</h3>
+                    <div id="venues">Loading...</div>
+                </div>
+                <div class="feature-card">
+                    <h3>Quick Actions</h3>
+                    <div class="form-actions" style="flex-direction:column">
+                        <a href="/owner/profile.html"><button type="button">Edit Profile</button></a>
+                        <a href="/owner/venues.html"><button type="button">Manage Venues</button></a>
+                        <a href="/owner/workers.html"><button type="button">Workers</button></a>
+                        <a href="/owner/billing.html"><button type="button">Billing</button></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            const status = document.getElementById('status');
+            function setStatus(m) {
+                status.textContent = m;
+            }
+            async function init() {
+                try {
+                    menu.innerHTML = LinkdNNav.owner();
+                    const p = await LinkdNAuthLive.getProfile();
+                    if (!p) {
+                        location.href = '/auth/login.html';
+                        return;
+                    }
+                    n.textContent = p.display_name || '-';
+                    e.textContent = p.email || '-';
+                    r.textContent = p.role || '-';
+                    const supabase = LinkdNSupabase.getClient();
+                    const { data, error } = await supabase.from('venues').select('*').eq('owner_profile_id', p.id).order('created_at', { ascending: false });
+                    if (error) throw error;
+                    venues.innerHTML = (data && data.length) ? data.map(v => `<div class="pill">${v.name} (${v.venue_status || 'pending_payment'})</div>`).join('') : '<div class="notice">No venues yet.</div>';
+                    setStatus('Dashboard loaded.');
+                } catch (err) {
+                    console.error(err);
+                    setStatus(err.message || 'Failed to load dashboard.');
+                }
+            }
+            init();
+        </script>
+    </body>
+</html>
