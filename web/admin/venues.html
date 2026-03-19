@@ -1,1 +1,115 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Venues</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Venues</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Owner</th><th>Status</th><th>Searchable</th></tr></thead><tbody id="tb"></tbody></table></div></div></div><script>menu.innerHTML=LinkdNNav.admin();async function init(){const p=await LinkdNAuthLive.getProfile();if(!p||!['admin','moderator'].includes(p.role)){location.href='/auth/login.html';return}const {data,error}=await LinkdNSupabase.getClient().from('venues').select('name,venue_status,searchable,profiles:owner_profile_id(display_name,email)').order('created_at',{ascending:false});if(error){tb.innerHTML=`<tr><td colspan="4">${error.message}</td></tr>`;return}tb.innerHTML=(data||[]).map(v=>`<tr><td>${v.name}</td><td>${v.profiles?.display_name||v.profiles?.email||'-'}</td><td>${v.venue_status}</td><td>${v.searchable?'Yes':'No'}</td></tr>`).join('');}init();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Venues</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/admin-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="table-wrap" style="margin-top:20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Owner</th>
+            <th>Status</th>
+            <th>Searchable</th>
+            <th>City/State</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="venuesTable"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNAdminShell.render("Admin Venues", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNAdminShell.nav();
+
+  async function loadVenues() {
+    const supabase = LinkdNSupabase.getClient();
+    const { data, error } = await supabase
+      .from("venues")
+      .select("*, profiles:owner_profile_id(display_name,email)")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const tbody = document.getElementById("venuesTable");
+    tbody.innerHTML = data && data.length ? data.map(v => `
+      <tr>
+        <td>${v.name || "-"}</td>
+        <td>${v.profiles?.display_name || v.profiles?.email || "-"}</td>
+        <td>${v.venue_status || "-"}</td>
+        <td>${v.searchable ? "Yes" : "No"}</td>
+        <td>${[v.city || "-", v.state || "-"].join(", ")}</td>
+        <td>
+          <button type="button" onclick="window.activateVenue('${v.id}')">Set Live</button>
+          <button type="button" onclick="window.pauseVenue('${v.id}')">Pause</button>
+          <button type="button" onclick="window.toggleSearch('${v.id}', ${v.searchable})">${v.searchable ? "Hide" : "Searchable"}</button>
+        </td>
+      </tr>
+    `).join("") : `<tr><td colspan="6">No venues found.</td></tr>`;
+  }
+
+  window.activateVenue = async function(id) {
+    try {
+      const supabase = LinkdNSupabase.getClient();
+      const { error } = await supabase.from("venues").update({ venue_status: "live", searchable: true, active: true }).eq("id", id);
+      if (error) throw error;
+      LinkdNAdminShell.setStatus("Venue set to live.");
+      await loadVenues();
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not update venue.");
+    }
+  };
+
+  window.pauseVenue = async function(id) {
+    try {
+      const supabase = LinkdNSupabase.getClient();
+      const { error } = await supabase.from("venues").update({ venue_status: "paused", searchable: false }).eq("id", id);
+      if (error) throw error;
+      LinkdNAdminShell.setStatus("Venue paused.");
+      await loadVenues();
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not pause venue.");
+    }
+  };
+
+  window.toggleSearch = async function(id, current) {
+    try {
+      const supabase = LinkdNSupabase.getClient();
+      const { error } = await supabase.from("venues").update({ searchable: !current }).eq("id", id);
+      if (error) throw error;
+      LinkdNAdminShell.setStatus("Venue search visibility updated.");
+      await loadVenues();
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not update search visibility.");
+    }
+  };
+
+  (async function init() {
+    try {
+      await LinkdNAdminShell.requireAdmin();
+      await loadVenues();
+      LinkdNAdminShell.setStatus("Venues loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not load venues.");
+    }
+  })();
+</script>
+</body>
+</html>

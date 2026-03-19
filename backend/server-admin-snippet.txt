@@ -1,0 +1,5 @@
+Add this import in your backend server file:
+import adminSystemRoutes from "./routes/admin-system.js";
+
+Then mount it:
+app.use("/api/admin-system", adminSystemRoutes);

@@ -1,1 +1,78 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Dashboard</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="form-card"><h2>Admin Dashboard</h2><p id="status" class="notice">Loading...</p></div><div class="metric-grid" style="margin-top:20px"><div class="metric-card"><h3>Profiles</h3><div class="summary-value" id="pc">0</div></div><div class="metric-card"><h3>Venues</h3><div class="summary-value" id="vc">0</div></div><div class="metric-card"><h3>Workers</h3><div class="summary-value" id="wc">0</div></div></div></div><script>menu.innerHTML=LinkdNNav.admin();async function init(){try{const p=await LinkdNAuthLive.getProfile();if(!p){location.href='/auth/login.html';return}if(!['admin','moderator'].includes(p.role)){location.href='/owner/dashboard.html';return}const supabase=LinkdNSupabase.getClient();const [{count:pcnt,error:e1},{count:vcnt,error:e2},{count:wcnt,error:e3}] = await Promise.all([supabase.from('profiles').select('*',{count:'exact',head:true}),supabase.from('venues').select('*',{count:'exact',head:true}),supabase.from('venue_workers').select('*',{count:'exact',head:true})]);if(e1||e2||e3) throw e1||e2||e3;pc.textContent=pcnt||0;vc.textContent=vcnt||0;wc.textContent=wcnt||0;status.textContent='Admin dashboard loaded.';}catch(err){console.error(err);status.textContent=err.message||'Failed to load admin dashboard.'}}init();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/admin-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="metric-grid" style="margin-top:20px;">
+      <div class="metric-card"><h3>Profiles</h3><div class="summary-value" id="m_profiles">0</div></div>
+      <div class="metric-card"><h3>Venues</h3><div class="summary-value" id="m_venues">0</div></div>
+      <div class="metric-card"><h3>Workers</h3><div class="summary-value" id="m_workers">0</div></div>
+      <div class="metric-card"><h3>Rooms</h3><div class="summary-value" id="m_rooms">0</div></div>
+      <div class="metric-card"><h3>Open Incidents</h3><div class="summary-value" id="m_incidents">0</div></div>
+      <div class="metric-card"><h3>Pending Billing</h3><div class="summary-value" id="m_billing">0</div></div>
+    </div>
+
+    <div class="feature-grid" style="margin-top:24px;">
+      <div class="feature-card">
+        <h3>Quick Actions</h3>
+        <div class="form-actions" style="flex-direction:column;">
+          <a href="/admin/venues.html"><button type="button">Manage Venues</button></a>
+          <a href="/admin/owners.html"><button type="button">Manage Owners</button></a>
+          <a href="/admin/workers.html"><button type="button">Manage Workers</button></a>
+          <a href="/admin/billing.html"><button type="button">Billing / Overrides</button></a>
+          <a href="/admin/rooms.html"><button type="button">Rooms / Schedules</button></a>
+        </div>
+      </div>
+      <div class="feature-card">
+        <h3>Admin Notes</h3>
+        <div class="notice">This is the live control center for owners, venues, workers, billing, room scheduling, and incidents.</div>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNAdminShell.render("Admin Dashboard", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNAdminShell.nav();
+
+  async function init() {
+    try {
+      await LinkdNAdminShell.requireAdmin();
+      const supabase = LinkdNSupabase.getClient();
+
+      const [profilesRes, venuesRes, workersRes, roomsRes, incidentsRes, billingRes] = await Promise.all([
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.from("venues").select("*", { count: "exact", head: true }),
+        supabase.from("venue_workers").select("*", { count: "exact", head: true }),
+        supabase.from("rooms").select("*", { count: "exact", head: true }),
+        supabase.from("incidents").select("*", { count: "exact", head: true }).eq("status", "open"),
+        supabase.from("venue_billing").select("*", { count: "exact", head: true }).eq("billing_status", "pending_payment")
+      ]);
+
+      document.getElementById("m_profiles").textContent = profilesRes.count || 0;
+      document.getElementById("m_venues").textContent = venuesRes.count || 0;
+      document.getElementById("m_workers").textContent = workersRes.count || 0;
+      document.getElementById("m_rooms").textContent = roomsRes.count || 0;
+      document.getElementById("m_incidents").textContent = incidentsRes.count || 0;
+      document.getElementById("m_billing").textContent = billingRes.count || 0;
+
+      LinkdNAdminShell.setStatus("Admin dashboard loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not load admin dashboard.");
+    }
+  }
+  init();
+</script>
+</body>
+</html>

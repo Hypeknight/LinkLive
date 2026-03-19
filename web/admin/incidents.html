@@ -1,1 +1,63 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Incidents</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Incidents</h2><div class="table-wrap"><table><thead><tr><th>Title</th><th>Type</th><th>Severity</th><th>Status</th></tr></thead><tbody id="tb"></tbody></table></div></div></div><script>menu.innerHTML=LinkdNNav.admin();async function init(){const p=await LinkdNAuthLive.getProfile();if(!p||!['admin','moderator'].includes(p.role)){location.href='/auth/login.html';return}const {data,error}=await LinkdNSupabase.getClient().from('incidents').select('*').order('created_at',{ascending:false});if(error){tb.innerHTML=`<tr><td colspan="4">${error.message}</td></tr>`;return}tb.innerHTML=(data||[]).length?(data||[]).map(i=>`<tr><td>${i.title}</td><td>${i.incident_type}</td><td>${i.severity}</td><td>${i.status}</td></tr>`).join(''):'<tr><td colspan="4">No incidents.</td></tr>';}init();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Incidents</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/admin-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="table-wrap" style="margin-top:20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Severity</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody id="incidentsTable"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNAdminShell.render("Admin Incidents", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNAdminShell.nav();
+
+  (async function init() {
+    try {
+      await LinkdNAdminShell.requireAdmin();
+      const supabase = LinkdNSupabase.getClient();
+      const { data, error } = await supabase.from("incidents").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const tbody = document.getElementById("incidentsTable");
+      tbody.innerHTML = data && data.length ? data.map(r => `
+        <tr>
+          <td>${r.title || "-"}</td>
+          <td>${r.incident_type || "-"}</td>
+          <td>${r.status || "-"}</td>
+          <td>${r.severity || "-"}</td>
+          <td>${r.description || "-"}</td>
+        </tr>
+      `).join("") : `<tr><td colspan="5">No incidents found.</td></tr>`;
+
+      LinkdNAdminShell.setStatus("Incidents loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not load incidents.");
+    }
+  })();
+</script>
+</body>
+</html>

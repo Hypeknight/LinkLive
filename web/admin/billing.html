@@ -1,1 +1,113 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Billing</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Billing</h2><div class="table-wrap"><table><thead><tr><th>Venue</th><th>Status</th><th>Plan</th><th>Due</th><th>Paid</th></tr></thead><tbody id="tb"></tbody></table></div></div></div><script>menu.innerHTML=LinkdNNav.admin();async function init(){const p=await LinkdNAuthLive.getProfile();if(!p||!['admin','moderator'].includes(p.role)){location.href='/auth/login.html';return}const supabase=LinkdNSupabase.getClient();const venues=(await supabase.from('venues').select('id,name')).data||[];const billing=(await supabase.from('venue_billing').select('*')).data||[];tb.innerHTML=venues.map(v=>{const b=billing.find(x=>x.venue_id===v.id)||{};return `<tr><td>${v.name}</td><td>${b.billing_status||'pending_payment'}</td><td>${b.current_plan||'starter'}</td><td>$${Number(b.amount_due||0).toFixed(2)}</td><td>$${Number(b.amount_paid||0).toFixed(2)}</td></tr>`}).join('')||'<tr><td colspan="5">No billing rows.</td></tr>';}init();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Billing</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/admin-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="table-wrap" style="margin-top:20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Venue</th>
+            <th>Status</th>
+            <th>Plan</th>
+            <th>Amount Due</th>
+            <th>Amount Paid</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="billingTable"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNAdminShell.render("Admin Billing", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNAdminShell.nav();
+
+  async function loadBilling() {
+    const supabase = LinkdNSupabase.getClient();
+    const { data, error } = await supabase
+      .from("venue_billing")
+      .select("*, venues:venue_id(name)")
+      .order("updated_at", { ascending: false });
+
+    if (error) throw error;
+
+    const tbody = document.getElementById("billingTable");
+    tbody.innerHTML = data && data.length ? data.map(r => `
+      <tr>
+        <td>${r.venues?.name || "-"}</td>
+        <td>${r.billing_status || "-"}</td>
+        <td>${r.current_plan || "-"}</td>
+        <td>${r.amount_due ?? 0}</td>
+        <td>${r.amount_paid ?? 0}</td>
+        <td>
+          <button type="button" onclick="window.markPaid('${r.venue_id}')">Mark Paid</button>
+          <button type="button" onclick="window.adminOverride('${r.venue_id}')">Admin Override</button>
+        </td>
+      </tr>
+    `).join("") : `<tr><td colspan="6">No billing records found.</td></tr>`;
+  }
+
+  window.markPaid = async function(venueId) {
+    try {
+      const supabase = LinkdNSupabase.getClient();
+      const { error: billingError } = await supabase.from("venue_billing").update({ billing_status: "paid" }).eq("venue_id", venueId);
+      if (billingError) throw billingError;
+      const { error: venueError } = await supabase.from("venues").update({ venue_status: "live", searchable: true, active: true }).eq("id", venueId);
+      if (venueError) throw venueError;
+      LinkdNAdminShell.setStatus("Venue marked paid and activated.");
+      await loadBilling();
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not update billing.");
+    }
+  };
+
+  window.adminOverride = async function(venueId) {
+    try {
+      const supabase = LinkdNSupabase.getClient();
+      const adminProfile = await LinkdNAuthLive.getProfile();
+      const { error: billingError } = await supabase.from("venue_billing").update({ billing_status: "admin_override" }).eq("venue_id", venueId);
+      if (billingError) throw billingError;
+      const { error: overrideError } = await supabase.from("venue_admin_overrides").insert({
+        venue_id: venueId,
+        moderator_profile_id: adminProfile.id,
+        override_type: "billing",
+        notes: "Admin override from live billing console."
+      });
+      if (overrideError) throw overrideError;
+      const { error: venueError } = await supabase.from("venues").update({ venue_status: "live", searchable: true, active: true }).eq("id", venueId);
+      if (venueError) throw venueError;
+      LinkdNAdminShell.setStatus("Admin override applied.");
+      await loadBilling();
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not apply admin override.");
+    }
+  };
+
+  (async function init() {
+    try {
+      await LinkdNAdminShell.requireAdmin();
+      await loadBilling();
+      LinkdNAdminShell.setStatus("Billing loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not load billing.");
+    }
+  })();
+</script>
+</body>
+</html>

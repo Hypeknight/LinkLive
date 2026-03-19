@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin System</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/admin-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="feature-grid" style="margin-top:20px;">
+      <div class="feature-card">
+        <h3>Environment Check</h3>
+        <p><strong>Supabase:</strong> <span id="sysSupabase">-</span></p>
+        <p><strong>Auth:</strong> <span id="sysAuth">-</span></p>
+        <p><strong>API Base:</strong> <span id="sysApi">-</span></p>
+      </div>
+      <div class="feature-card">
+        <h3>Notes</h3>
+        <div class="notice">If you see “Supabase is not initialized,” that is usually a script load order or stale cache issue, not missing data.</div>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNAdminShell.render("Admin System", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNAdminShell.nav();
+
+  (async function init() {
+    try {
+      await LinkdNAdminShell.requireAdmin();
+      document.getElementById("sysSupabase").textContent = window.LinkdNSupabase ? "Loaded" : "Missing";
+      document.getElementById("sysAuth").textContent = window.LinkdNAuthLive ? "Loaded" : "Missing";
+      document.getElementById("sysApi").textContent = (window.LINKDN_CONFIG && window.LINKDN_CONFIG.API_BASE) || "-";
+      LinkdNAdminShell.setStatus("System check loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not load system check.");
+    }
+  })();
+</script>
+</body>
+</html>

@@ -1,1 +1,66 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Workers</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Workers</h2><div class="table-wrap"><table><thead><tr><th>Email</th><th>Venue</th><th>Level</th><th>Active</th></tr></thead><tbody id="tb"></tbody></table></div></div></div><script>menu.innerHTML=LinkdNNav.admin();async function init(){const p=await LinkdNAuthLive.getProfile();if(!p||!['admin','moderator'].includes(p.role)){location.href='/auth/login.html';return}const {data,error}=await LinkdNSupabase.getClient().from('venue_workers').select('access_level,active,profiles:profile_id(email),venues:venue_id(name)').order('created_at',{ascending:false});if(error){tb.innerHTML=`<tr><td colspan="4">${error.message}</td></tr>`;return}tb.innerHTML=(data||[]).map(r=>`<tr><td>${r.profiles?.email||'-'}</td><td>${r.venues?.name||'-'}</td><td>${r.access_level}</td><td>${r.active?'Yes':'No'}</td></tr>`).join('');}init();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Workers</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/admin-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="table-wrap" style="margin-top:20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Worker Email</th>
+            <th>Venue</th>
+            <th>Access Level</th>
+            <th>Active</th>
+          </tr>
+        </thead>
+        <tbody id="workersTable"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNAdminShell.render("Admin Workers", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNAdminShell.nav();
+
+  async function init() {
+    try {
+      await LinkdNAdminShell.requireAdmin();
+      const supabase = LinkdNSupabase.getClient();
+      const { data, error } = await supabase
+        .from("venue_workers")
+        .select("access_level, active, profiles:profile_id(email), venues:venue_id(name)")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const tbody = document.getElementById("workersTable");
+      tbody.innerHTML = data && data.length ? data.map(r => `
+        <tr>
+          <td>${r.profiles?.email || "-"}</td>
+          <td>${r.venues?.name || "-"}</td>
+          <td>${r.access_level || "-"}</td>
+          <td>${r.active ? "Yes" : "No"}</td>
+        </tr>
+      `).join("") : `<tr><td colspan="4">No workers found.</td></tr>`;
+
+      LinkdNAdminShell.setStatus("Workers loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not load workers.");
+    }
+  }
+  init();
+</script>
+</body>
+</html>

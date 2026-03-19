@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Rooms</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/admin-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="form-card" style="margin-top:20px;">
+      <form id="roomForm">
+        <div class="form-row">
+          <div>
+            <label>Room Title</label>
+            <input id="room_title" required>
+          </div>
+          <div>
+            <label>Room Slug</label>
+            <input id="room_slug" required>
+          </div>
+        </div>
+        <label style="margin-top:14px;">Notes</label>
+        <input id="room_notes">
+        <div class="form-actions" style="margin-top:16px;">
+          <button type="submit">Create Room</button>
+        </div>
+      </form>
+      <p id="roomStatus" class="notice" style="display:none;margin-top:14px;"></p>
+    </div>
+
+    <div class="table-wrap" style="margin-top:24px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Slug</th>
+            <th>Active</th>
+          </tr>
+        </thead>
+        <tbody id="roomsTable"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNAdminShell.render("Admin Rooms", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNAdminShell.nav();
+
+  function showRoomStatus(msg) {
+    const el = document.getElementById("roomStatus");
+    el.style.display = "block";
+    el.textContent = msg;
+  }
+
+  async function loadRooms() {
+    const supabase = LinkdNSupabase.getClient();
+    const { data, error } = await supabase.from("rooms").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+
+    const tbody = document.getElementById("roomsTable");
+    tbody.innerHTML = data && data.length ? data.map(r => `
+      <tr>
+        <td>${r.title || "-"}</td>
+        <td>${r.slug || "-"}</td>
+        <td>${r.is_active ? "Yes" : "No"}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="3">No rooms found.</td></tr>`;
+  }
+
+  document.getElementById("roomForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showRoomStatus("Creating room...");
+    try {
+      const supabase = LinkdNSupabase.getClient();
+      const admin = await LinkdNAuthLive.getProfile();
+      const { error } = await supabase.from("rooms").insert({
+        title: (document.getElementById("room_title").value || "").trim(),
+        slug: (document.getElementById("room_slug").value || "").trim(),
+        notes: (document.getElementById("room_notes").value || "").trim(),
+        is_active: true,
+        created_by: admin.id
+      });
+      if (error) throw error;
+      showRoomStatus("Room created.");
+      e.target.reset();
+      await loadRooms();
+    } catch (err) {
+      console.error(err);
+      showRoomStatus(err.message || "Could not create room.");
+    }
+  });
+
+  (async function init() {
+    try {
+      await LinkdNAdminShell.requireAdmin();
+      await loadRooms();
+      LinkdNAdminShell.setStatus("Rooms loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not load rooms.");
+    }
+  })();
+</script>
+</body>
+</html>

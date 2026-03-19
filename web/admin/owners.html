@@ -1,1 +1,86 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Owners</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Owners</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th></tr></thead><tbody id="tb"></tbody></table></div></div></div><script>menu.innerHTML=LinkdNNav.admin();async function init(){const p=await LinkdNAuthLive.getProfile();if(!p||!['admin','moderator'].includes(p.role)){location.href='/auth/login.html';return}const {data,error}=await LinkdNSupabase.getClient().from('profiles').select('*').in('role',['owner','admin','moderator']).order('created_at',{ascending:false});if(error){tb.innerHTML=`<tr><td colspan="4">${error.message}</td></tr>`;return}tb.innerHTML=(data||[]).map(r=>`<tr><td>${r.display_name||'-'}</td><td>${r.email||'-'}</td><td>${r.role}</td><td>${r.active?'Yes':'No'}</td></tr>`).join('');}init();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Owners</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/admin-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="table-wrap" style="margin-top:20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Active</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ownersTable"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNAdminShell.render("Admin Owners", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNAdminShell.nav();
+
+  async function loadOwners() {
+    const supabase = LinkdNSupabase.getClient();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("role", "owner")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const tbody = document.getElementById("ownersTable");
+    tbody.innerHTML = data && data.length ? data.map(o => `
+      <tr>
+        <td>${o.display_name || "-"}</td>
+        <td>${o.email || "-"}</td>
+        <td>${o.phone || "-"}</td>
+        <td>${o.active ? "Yes" : "No"}</td>
+        <td>
+          <button type="button" onclick="window.toggleOwner('${o.id}', ${o.active})">${o.active ? "Disable" : "Enable"}</button>
+        </td>
+      </tr>
+    `).join("") : `<tr><td colspan="5">No owners found.</td></tr>`;
+  }
+
+  window.toggleOwner = async function(id, current) {
+    try {
+      const supabase = LinkdNSupabase.getClient();
+      const { error } = await supabase.from("profiles").update({ active: !current }).eq("id", id);
+      if (error) throw error;
+      LinkdNAdminShell.setStatus("Owner updated.");
+      await loadOwners();
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not update owner.");
+    }
+  };
+
+  (async function init() {
+    try {
+      await LinkdNAdminShell.requireAdmin();
+      await loadOwners();
+      LinkdNAdminShell.setStatus("Owners loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNAdminShell.setStatus(err.message || "Could not load owners.");
+    }
+  })();
+</script>
+</body>
+</html>
