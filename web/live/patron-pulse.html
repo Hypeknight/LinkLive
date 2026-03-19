@@ -1,1 +1,109 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>patron-pulse</title><link rel="stylesheet" href="/common/app.css"><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Patron-pulse</h2><p class="notice">Live module scaffold for patron-pulse.</p></div></div><script>menu.innerHTML=LinkdNNav.live();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patron Pulse Live</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/venue-shell.js"></script>
+  <script src="/common/venue-live.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="feature-grid" style="margin-top:20px;">
+      <div class="feature-card">
+        <h3>Active Room</h3>
+        <p><strong>Room:</strong> <span id="roomSlug">-</span></p>
+        <p><strong>Poll Type:</strong> <span id="pollType">-</span></p>
+        <p><strong>Question:</strong> <span id="pollQuestion">-</span></p>
+      </div>
+      <div class="feature-card">
+        <h3>Vote Panel</h3>
+        <div id="pollOptions">No open poll found.</div>
+      </div>
+      <div class="feature-card">
+        <h3>Status</h3>
+        <p id="pulseStatus" class="notice">Loading poll data...</p>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNVenueShell.render("Patron Pulse Live", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNVenueShell.venueNav();
+
+  let currentPoll = null;
+
+  function setPulseStatus(msg) {
+    document.getElementById("pulseStatus").textContent = msg;
+  }
+
+  async function loadPoll() {
+    try {
+      const venue = await LinkdNVenueLive.getVenueForCurrentUser();
+      if (!venue) throw new Error("No venue found for this account.");
+
+      const state = await LinkdNVenueLive.getOrCreateLocalControlState(venue.id);
+      const roomSlug = state.room_slug || "";
+      document.getElementById("roomSlug").textContent = roomSlug || "-";
+
+      if (!roomSlug) {
+        document.getElementById("pollOptions").innerHTML = '<div class="notice">This venue is not linked to a room yet.</div>';
+        setPulseStatus("No room linked.");
+        return;
+      }
+
+      const room = await LinkdNVenueLive.getRoomBySlug(roomSlug);
+      if (!room) throw new Error("Linked room was not found.");
+
+      const poll = await LinkdNVenueLive.getOpenPoll(room.id);
+      currentPoll = poll || null;
+
+      if (!poll) {
+        document.getElementById("pollType").textContent = "-";
+        document.getElementById("pollQuestion").textContent = "-";
+        document.getElementById("pollOptions").innerHTML = '<div class="notice">No open poll found for this room.</div>';
+        setPulseStatus("No open poll.");
+        return;
+      }
+
+      document.getElementById("pollType").textContent = poll.type || "-";
+      document.getElementById("pollQuestion").textContent = poll.question || "-";
+
+      const options = (poll.patron_poll_options || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      document.getElementById("pollOptions").innerHTML = options.length
+        ? options.map(o => `
+            <div style="margin-bottom:10px;">
+              <button type="button" onclick="window.castPulseVote('${o.id}')">${o.label}</button>
+            </div>
+          `).join("")
+        : '<div class="notice">No options available.</div>';
+
+      setPulseStatus("Poll loaded.");
+    } catch (err) {
+      console.error(err);
+      setPulseStatus(err.message || "Could not load poll.");
+    }
+  }
+
+  window.castPulseVote = async function(optionId) {
+    try {
+      if (!currentPoll) throw new Error("No active poll.");
+      const voterSessionId = LinkdNVenueLive.getOrCreateVoterSession();
+      await LinkdNVenueLive.castVote(currentPoll.id, optionId, voterSessionId);
+      setPulseStatus("Vote submitted.");
+    } catch (err) {
+      console.error(err);
+      setPulseStatus(err.message || "Could not submit vote.");
+    }
+  };
+
+  loadPoll();
+</script>
+</body>
+</html>

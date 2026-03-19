@@ -1,1 +1,201 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>rooms</title><link rel="stylesheet" href="/common/app.css"><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Rooms</h2><p class="notice">Live module scaffold for rooms.</p></div></div><script>menu.innerHTML=LinkdNNav.live();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Device & Room Link</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.7/livekit-client.umd.js"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/livekit.js"></script>
+  <script src="/common/venue-shell.js"></script>
+  <script src="/common/venue-live.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="form-card" style="margin-top:20px;">
+      <p id="linkStatus" class="notice">Loading room and device configuration...</p>
+
+      <div class="form-row" style="margin-top:16px;">
+        <div>
+          <label>Venue</label>
+          <input id="venueName" disabled>
+        </div>
+        <div>
+          <label>Current Room</label>
+          <select id="roomSelect"></select>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top:16px;">
+        <div>
+          <label>Saved Camera</label>
+          <select id="cameraSelect"></select>
+        </div>
+        <div>
+          <label>Saved Audio Input</label>
+          <select id="audioSelect"></select>
+        </div>
+      </div>
+
+      <div class="form-actions" style="margin-top:16px;">
+        <button type="button" id="grantBtn">Allow Camera & Mic Access</button>
+        <button type="button" id="refreshDevicesBtn">Refresh Devices</button>
+        <button type="button" id="saveLinkBtn">Save Venue Routing</button>
+      </div>
+
+      <div class="form-actions" style="margin-top:16px;">
+        <button type="button" id="connectBtn">Connect Venue To Room</button>
+        <button type="button" id="disconnectBtn">Disconnect Venue</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNVenueShell.render("Device & Room Link", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNVenueShell.venueNav();
+
+  let currentVenue = null;
+
+  function setLinkStatus(msg) {
+    document.getElementById("linkStatus").textContent = msg;
+  }
+
+  async function loadRooms() {
+    const rooms = await LinkdNVenueLive.getRooms();
+    const roomSelect = document.getElementById("roomSelect");
+    roomSelect.innerHTML = rooms.length
+      ? rooms.map(r => `<option value="${r.slug}">${r.title} (${r.slug})</option>`).join("")
+      : `<option value="">No active rooms</option>`;
+  }
+
+  async function loadDevices() {
+    const { videoInputs, audioInputs } = await LinkdNLiveKit.listDevices();
+    const cameraSelect = document.getElementById("cameraSelect");
+    const audioSelect = document.getElementById("audioSelect");
+
+    cameraSelect.innerHTML = videoInputs.length
+      ? videoInputs.map((d, i) => `<option value="${d.deviceId}">${d.label || `Camera ${i+1}`}</option>`).join("")
+      : `<option value="">No cameras found</option>`;
+
+    audioSelect.innerHTML = audioInputs.length
+      ? audioInputs.map((d, i) => `<option value="${d.deviceId}">${d.label || `Audio Input ${i+1}`}</option>`).join("")
+      : `<option value="">No audio inputs found</option>`;
+
+    const saved = JSON.parse(localStorage.getItem("linkdn_device_setup") || "{}");
+    if (saved.cameraId) cameraSelect.value = saved.cameraId;
+    if (saved.audioId) audioSelect.value = saved.audioId;
+  }
+
+  async function init() {
+    try {
+      const profile = await LinkdNVenueShell.requireVenueAccess();
+      if (!profile) return;
+      currentVenue = await LinkdNVenueLive.getVenueForCurrentUser();
+      if (!currentVenue) throw new Error("No venue found for this account.");
+
+      document.getElementById("venueName").value = currentVenue.name || "";
+      await loadRooms();
+
+      const state = await LinkdNVenueLive.getOrCreateLocalControlState(currentVenue.id);
+      if (state?.room_slug) {
+        document.getElementById("roomSelect").value = state.room_slug;
+      }
+
+      await loadDevices();
+      LinkdNVenueShell.setStatus(`Ready to link ${currentVenue.name} to a room.`);
+      setLinkStatus("Venue link panel ready.");
+    } catch (err) {
+      console.error(err);
+      LinkdNVenueShell.setStatus(err.message || "Could not initialize device-room link.");
+      setLinkStatus(err.message || "Could not initialize device-room link.");
+    }
+  }
+
+  document.getElementById("grantBtn").addEventListener("click", async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      await loadDevices();
+      setLinkStatus("Device access granted.");
+    } catch (err) {
+      console.error(err);
+      setLinkStatus(err.message || "Permission denied.");
+    }
+  });
+
+  document.getElementById("refreshDevicesBtn").addEventListener("click", async () => {
+    try {
+      await loadDevices();
+      setLinkStatus("Devices refreshed.");
+    } catch (err) {
+      console.error(err);
+      setLinkStatus(err.message || "Could not refresh devices.");
+    }
+  });
+
+  document.getElementById("saveLinkBtn").addEventListener("click", async () => {
+    try {
+      const roomSlug = document.getElementById("roomSelect").value;
+      const cameraSelect = document.getElementById("cameraSelect");
+      const audioSelect = document.getElementById("audioSelect");
+
+      localStorage.setItem("linkdn_device_setup", JSON.stringify({
+        cameraId: cameraSelect.value,
+        audioId: audioSelect.value,
+        cameraName: cameraSelect.options[cameraSelect.selectedIndex]?.text || "",
+        audioName: audioSelect.options[audioSelect.selectedIndex]?.text || ""
+      }));
+
+      await LinkdNVenueLive.updateLocalControlState(currentVenue.id, {
+        room_slug: roomSlug
+      });
+
+      setLinkStatus("Venue routing and device preferences saved.");
+    } catch (err) {
+      console.error(err);
+      setLinkStatus(err.message || "Could not save routing.");
+    }
+  });
+
+  document.getElementById("connectBtn").addEventListener("click", async () => {
+    try {
+      const roomSlug = document.getElementById("roomSelect").value.trim();
+      if (!roomSlug) throw new Error("Please choose a room.");
+
+      await LinkdNVenueLive.updateLocalControlState(currentVenue.id, { room_slug: roomSlug });
+
+      await LinkdNLiveKit.connect({
+        roomName: roomSlug,
+        identity: `venue-${currentVenue.id}`,
+        name: currentVenue.name || `venue-${currentVenue.id}`,
+        metadata: JSON.stringify({ venueId: currentVenue.id, role: "venue" })
+      });
+
+      await LinkdNLiveKit.applySavedDevices();
+      await LinkdNLiveKit.enableCamera(true);
+      await LinkdNLiveKit.enableMicrophone(true);
+
+      setLinkStatus(`Connected ${currentVenue.name} to ${roomSlug}.`);
+    } catch (err) {
+      console.error(err);
+      setLinkStatus(err.message || "Could not connect venue to room.");
+    }
+  });
+
+  document.getElementById("disconnectBtn").addEventListener("click", async () => {
+    try {
+      await LinkdNLiveKit.disconnect();
+      setLinkStatus("Venue disconnected from room.");
+    } catch (err) {
+      console.error(err);
+      setLinkStatus(err.message || "Could not disconnect.");
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>
