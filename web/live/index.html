@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ops</title>
+  <title>Show Dashboard</title>
   <link rel="stylesheet" href="assets/css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/app.js"></script>
 </head>
-<body data-page="ops">
+<body data-page="dashboard">
   <header>
     <div class="topbar">
       <div class="brand">Live Venue Control <small data-venue></small></div>
@@ -28,23 +28,21 @@
   <main>
     
 <section class="grid">
-  <div class="card span-5">
-    <h2>Add Ops Item</h2>
-    <form id="opsForm">
-      <label>Title</label><input name="title" required>
-      <div class="row">
-        <div class="col-4"><label>Priority</label><select name="priority"><option>low</option><option selected>medium</option><option>high</option></select></div>
-        <div class="col-4"><label>Status</label><select name="status"><option selected>open</option><option>in_progress</option><option>closed</option></select></div>
-        <div class="col-4"><label>Assigned To</label><input name="assigned_to" placeholder="Ops / Security / Stage"></div>
-      </div>
-      <label>Room</label><select id="opsRoomId" name="room_id"></select>
-      <label>Note</label><textarea name="note"></textarea>
-      <button class="btn primary" type="submit">Save Ops Item</button>
-    </form>
+  <div class="card span-3"><div class="muted">Rooms</div><div id="kpiRooms" class="kpi">0</div></div>
+  <div class="card span-3"><div class="muted">Devices</div><div id="kpiDevices" class="kpi">0</div></div>
+  <div class="card span-3"><div class="muted">Live/Scheduled Shows</div><div id="kpiLiveShows" class="kpi">0</div></div>
+  <div class="card span-3"><div class="muted">Current Pulse</div><div id="kpiPulse" class="kpi">0</div></div>
+  <div class="card span-4">
+    <h2>Room Status</h2>
+    <div id="roomStatus" class="list"></div>
   </div>
-  <div class="card span-7">
-    <h2>Ops Board</h2>
-    <div id="opsList" class="list"></div>
+  <div class="card span-8">
+    <h2>Today’s Schedule</h2>
+    <div class="table-wrap"><table><thead><tr><th>Start</th><th>Title</th><th>Status</th><th>Lead</th></tr></thead><tbody id="todaySchedule"></tbody></table></div>
+  </div>
+  <div class="card span-12">
+    <h2>Pulse Feed</h2>
+    <div id="pulseFeed" class="grid"></div>
   </div>
 </section>
 

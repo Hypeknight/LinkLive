@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rooms</title>
+  <title>Scheduling</title>
   <link rel="stylesheet" href="assets/css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/app.js"></script>
 </head>
-<body data-page="rooms">
+<body data-page="scheduling">
   <header>
     <div class="topbar">
       <div class="brand">Live Venue Control <small data-venue></small></div>
@@ -29,32 +29,25 @@
     
 <section class="grid">
   <div class="card span-5">
-    <h2>Create Room</h2>
-    <form id="roomForm">
-      <label>Room Name</label><input name="name" required>
+    <h2>Create Schedule Item</h2>
+    <form id="scheduleForm">
+      <label>Title</label><input name="title" required>
+      <label>Room</label><select id="scheduleRoomId" name="room_id"></select>
       <div class="row">
-        <div class="col-6"><label>Zone</label><input name="zone" placeholder="North / VIP / Main"></div>
-        <div class="col-6"><label>Capacity</label><input type="number" name="capacity" min="0"></div>
+        <div class="col-6"><label>Start</label><input type="datetime-local" name="start_at" required></div>
+        <div class="col-6"><label>End</label><input type="datetime-local" name="end_at" required></div>
       </div>
-      <label>Status</label><select name="status"><option selected>active</option><option>inactive</option><option>maintenance</option></select>
+      <div class="row">
+        <div class="col-6"><label>Status</label><select name="status"><option selected>scheduled</option><option>live</option><option>completed</option><option>cancelled</option></select></div>
+        <div class="col-6"><label>Lead</label><input name="lead_name"></div>
+      </div>
       <label>Notes</label><textarea name="notes"></textarea>
-      <button class="btn primary" type="submit">Save Room</button>
+      <button class="btn primary" type="submit">Save Schedule</button>
     </form>
   </div>
   <div class="card span-7">
-    <h2>Assign Camera/Mic to Room</h2>
-    <form id="assignForm">
-      <label>Room</label><select id="assignRoomId" name="room_id"></select>
-      <label>Camera</label><select id="assignCameraId" name="assigned_camera_id"></select>
-      <label>Microphone</label><select id="assignMicId" name="assigned_mic_id"></select>
-      <div id="assignHint" class="muted small">Choose a room and assign devices.</div>
-      <br>
-      <button class="btn primary" type="submit">Save Assignment</button>
-    </form>
-  </div>
-  <div class="card span-12">
-    <h2>Rooms</h2>
-    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Zone</th><th>Capacity</th><th>Status</th><th>Camera</th><th>Mic</th><th>Actions</th></tr></thead><tbody id="roomsBody"></tbody></table></div>
+    <h2>Schedule Board</h2>
+    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Room</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody id="scheduleBody"></tbody></table></div>
   </div>
 </section>
 

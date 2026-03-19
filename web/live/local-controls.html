@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ops</title>
+  <title>Local Controls</title>
   <link rel="stylesheet" href="assets/css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/app.js"></script>
 </head>
-<body data-page="ops">
+<body data-page="controls">
   <header>
     <div class="topbar">
       <div class="brand">Live Venue Control <small data-venue></small></div>
@@ -29,22 +29,20 @@
     
 <section class="grid">
   <div class="card span-5">
-    <h2>Add Ops Item</h2>
-    <form id="opsForm">
-      <label>Title</label><input name="title" required>
-      <div class="row">
-        <div class="col-4"><label>Priority</label><select name="priority"><option>low</option><option selected>medium</option><option>high</option></select></div>
-        <div class="col-4"><label>Status</label><select name="status"><option selected>open</option><option>in_progress</option><option>closed</option></select></div>
-        <div class="col-4"><label>Assigned To</label><input name="assigned_to" placeholder="Ops / Security / Stage"></div>
-      </div>
-      <label>Room</label><select id="opsRoomId" name="room_id"></select>
-      <label>Note</label><textarea name="note"></textarea>
-      <button class="btn primary" type="submit">Save Ops Item</button>
-    </form>
+    <h2>Local Camera/Mic Controls</h2>
+    <label>Room</label><select id="controlRoomId"></select>
+    <label>Camera Input</label><select id="localCamId"></select>
+    <label>Microphone Input</label><select id="localMicId"></select>
+    <button id="startPreviewBtn" class="btn primary" type="button">Start Preview</button>
+    <button id="stopPreviewBtn" class="btn" type="button">Stop Preview</button>
+    <button id="saveLocalMapBtn" class="btn" type="button">Map Devices to Room</button>
+    <p id="previewStatus" class="muted small">Preview idle</p>
+    <hr>
+    <p class="small muted">Use this page on the local machine that has the show camera and mic attached. Most browsers require HTTPS or localhost for media access.</p>
   </div>
   <div class="card span-7">
-    <h2>Ops Board</h2>
-    <div id="opsList" class="list"></div>
+    <h2>Preview</h2>
+    <video id="previewVideo" autoplay muted playsinline></video>
   </div>
 </section>
 
