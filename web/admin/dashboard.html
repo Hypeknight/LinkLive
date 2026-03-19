@@ -1,1 +1,121 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Dashboard</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js"></script><script src="/common/supabase.js"></script><script src="/common/auth-live.js"></script><script src="/common/ui.js"></script></head><body><div id="app"></div><script>async function init(){const p=await LinkdNAuthLive.requireRole(['moderator','admin']); if(!p) return; document.getElementById('app').innerHTML=`${LinkdNUI.topbar('Admin dashboard', LinkdNUI.adminNav())}<div class="page-wrap"><div class="summary-grid"><div class="metric-card"><h3>User</h3><div>${p.display_name||'-'}</div><div class="small">${p.role}</div></div><div class="metric-card"><h3>Venues</h3><div id="venues">...</div></div><div class="metric-card"><h3>Workers</h3><div id="workers">...</div></div></div><div class="card" style="margin-top:16px"><h3>System</h3><div id="metricsStatus">Loading metrics...</div></div></div>`; LinkdNUI.bindLogout(LinkdNAuthLive.signOut); const res=await fetch(`${window.LINKDN_CONFIG.API_BASE}/api/admin/metrics`); const data=await res.json(); document.getElementById('venues').textContent=data.venues??0; document.getElementById('workers').textContent=data.workers??0; document.getElementById('metricsStatus').textContent=`Profiles: ${data.profiles??0}, Rooms: ${data.rooms??0}, Patron polls: ${data.polls??0}`;} init();</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard - Linkd'N</title>
+  <link rel="stylesheet" href="/common/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js?v=debug1"></script>
+  <script src="/common/supabase.js?v=debug1"></script>
+  <script src="/common/auth-live.js?v=debug1"></script>
+  <script src="/common/nav.js?v=debug1"></script>
+</head>
+<body>
+  <div class="page-wrap">
+    <div id="menu"></div>
+
+    <div class="form-card">
+      <h2>Admin Dashboard</h2>
+      <p id="status" class="notice">Loading admin dashboard...</p>
+    </div>
+
+    <div class="feature-grid" style="margin-top:20px;">
+      <div class="feature-card">
+        <h3>Admin</h3>
+        <p><strong>Name:</strong> <span id="displayName">-</span></p>
+        <p><strong>Email:</strong> <span id="email">-</span></p>
+        <p><strong>Role:</strong> <span id="role">-</span></p>
+      </div>
+
+      <div class="feature-card">
+        <h3>Counts</h3>
+        <p><strong>Profiles:</strong> <span id="profilesCount">0</span></p>
+        <p><strong>Venues:</strong> <span id="venuesCount">0</span></p>
+        <p><strong>Workers:</strong> <span id="workersCount">0</span></p>
+      </div>
+
+      <div class="feature-card">
+        <h3>Quick Actions</h3>
+        <div class="form-actions" style="flex-direction:column;">
+          <a href="/admin/owners.html"><button type="button">Owners</button></a>
+          <a href="/admin/venues.html"><button type="button">Venues</button></a>
+          <a href="/admin/workers.html"><button type="button">Workers</button></a>
+          <a href="/admin/billing.html"><button type="button">Billing</button></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
+
+    async function initDashboard() {
+      try {
+        if (!window.LinkdNNav) throw new Error("LinkdNNav is not loaded.");
+        if (!window.LinkdNAuthLive) throw new Error("LinkdNAuthLive is not loaded.");
+        if (!window.LinkdNSupabase) throw new Error("LinkdNSupabase is not loaded.");
+
+        document.getElementById("menu").innerHTML = LinkdNNav.admin
+          ? LinkdNNav.admin()
+          : `<nav class="app-nav">
+              <a href="/admin/dashboard.html">Dashboard</a>
+              <a href="/admin/owners.html">Owners</a>
+              <a href="/admin/venues.html">Venues</a>
+              <a href="/admin/workers.html">Workers</a>
+              <a href="/admin/billing.html">Billing</a>
+            </nav>`;
+
+        const profile = await LinkdNAuthLive.getProfile();
+
+        if (!profile) {
+          setStatus("No logged in user found. Redirecting...");
+          setTimeout(() => location.href = "/auth/login.html", 800);
+          return;
+        }
+
+        if (!["admin", "moderator"].includes(profile.role)) {
+          setStatus("Access denied.");
+          setTimeout(() => location.href = "/owner/dashboard.html", 800);
+          return;
+        }
+
+        document.getElementById("displayName").textContent = profile.display_name || "-";
+        document.getElementById("email").textContent = profile.email || "-";
+        document.getElementById("role").textContent = profile.role || "-";
+
+        const supabase = window.LinkdNSupabase.getClient();
+
+        const [
+          { count: profilesCount, error: profilesErr },
+          { count: venuesCount, error: venuesErr },
+          { count: workersCount, error: workersErr }
+        ] = await Promise.all([
+          supabase.from("profiles").select("*", { count: "exact", head: true }),
+          supabase.from("venues").select("*", { count: "exact", head: true }),
+          supabase.from("venue_workers").select("*", { count: "exact", head: true })
+        ]);
+
+        if (profilesErr) throw profilesErr;
+        if (venuesErr) throw venuesErr;
+        if (workersErr) throw workersErr;
+
+        document.getElementById("profilesCount").textContent = profilesCount || 0;
+        document.getElementById("venuesCount").textContent = venuesCount || 0;
+        document.getElementById("workersCount").textContent = workersCount || 0;
+
+        setStatus("Admin dashboard loaded.");
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || "Admin dashboard failed to load.");
+      }
+    }
+
+    initDashboard();
+  </script>
+</body>
+</html>
