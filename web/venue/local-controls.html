@@ -1,1 +1,113 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Local Controls</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.7/livekit-client.umd.js"></script><script src="/common/config.js?v=v2full"></script><script src="/common/livekit.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="form-card"><h2>Local Controls</h2><p id="status" class="notice">Ready.</p><label>Room Name</label><input id="roomName" value="central-battle-room"><label style="margin-top:14px">Identity</label><input id="identity" value="venue-local-node"><div class="form-actions"><button type="button" id="connect">Connect</button><button type="button" id="disconnect">Disconnect</button><button type="button" id="camOn">Camera On</button><button type="button" id="camOff">Camera Off</button><button type="button" id="micOn">Mic On</button><button type="button" id="micOff">Mic Off</button></div></div></div><script>menu.innerHTML=LinkdNNav.venue();function setStatus(m){status.textContent=m}connect.onclick=async()=>{try{await LinkdNLiveKit.connectStub();setStatus('LiveKit stub loaded. Replace with token/room flow when backend route is mounted.');}catch(err){console.error(err);setStatus(err.message||'Could not connect.')}};disconnect.onclick=()=>setStatus('Disconnected.');camOn.onclick=()=>setStatus('Camera on action ready.');camOff.onclick=()=>setStatus('Camera off action ready.');micOn.onclick=()=>setStatus('Mic on action ready.');micOff.onclick=()=>setStatus('Mic off action ready.');</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venue Local Controls</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.7/livekit-client.umd.js"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/livekit.js"></script>
+  <script src="/common/venue-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="form-card" style="margin-top:20px;">
+      <p id="controlStatus" class="notice">Ready.</p>
+
+      <label>Room Name</label>
+      <input id="roomName" value="central-battle-room">
+
+      <label style="margin-top:14px;">Identity</label>
+      <input id="identity" value="venue-local-node">
+
+      <div class="form-actions" style="margin-top:16px;">
+        <button type="button" id="connectBtn">Connect</button>
+        <button type="button" id="disconnectBtn">Disconnect</button>
+      </div>
+
+      <div class="form-actions" style="margin-top:16px;">
+        <button type="button" id="camOnBtn">Camera On</button>
+        <button type="button" id="camOffBtn">Camera Off</button>
+        <button type="button" id="micOnBtn">Mic On</button>
+        <button type="button" id="micOffBtn">Mic Off</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNVenueShell.render("Local Controls", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNVenueShell.venueNav();
+
+  const controlStatus = document.getElementById("controlStatus");
+  function setControlStatus(msg) { controlStatus.textContent = msg; }
+
+  async function init() {
+    try {
+      const profile = await LinkdNVenueShell.requireVenueAccess();
+      if (!profile) return;
+      const venue = await LinkdNVenueShell.getActiveVenue(profile);
+      if (!venue) throw new Error("No venue found for this account.");
+      document.getElementById("identity").value = `venue-${venue.id}`;
+      LinkdNVenueShell.setStatus(`Local controls ready for ${venue.name}`);
+    } catch (err) {
+      console.error(err);
+      LinkdNVenueShell.setStatus(err.message || "Could not load local controls.");
+    }
+  }
+
+  document.getElementById("connectBtn").addEventListener("click", async () => {
+    try {
+      await LinkdNLiveKit.connect({
+        roomName: document.getElementById("roomName").value.trim(),
+        identity: document.getElementById("identity").value.trim(),
+        name: document.getElementById("identity").value.trim(),
+        metadata: JSON.stringify({ role: "venue" })
+      });
+      await LinkdNLiveKit.applySavedDevices();
+      await LinkdNLiveKit.enableCamera(true);
+      await LinkdNLiveKit.enableMicrophone(true);
+      setControlStatus("Connected and devices applied.");
+    } catch (err) {
+      console.error(err);
+      setControlStatus(err.message || "Could not connect.");
+    }
+  });
+
+  document.getElementById("disconnectBtn").addEventListener("click", async () => {
+    try {
+      await LinkdNLiveKit.disconnect();
+      setControlStatus("Disconnected.");
+    } catch (err) {
+      console.error(err);
+      setControlStatus(err.message || "Could not disconnect.");
+    }
+  });
+
+  document.getElementById("camOnBtn").addEventListener("click", async () => {
+    try { await LinkdNLiveKit.enableCamera(true); setControlStatus("Camera on."); }
+    catch (err) { console.error(err); setControlStatus(err.message || "Could not enable camera."); }
+  });
+
+  document.getElementById("camOffBtn").addEventListener("click", async () => {
+    try { await LinkdNLiveKit.enableCamera(false); setControlStatus("Camera off."); }
+    catch (err) { console.error(err); setControlStatus(err.message || "Could not disable camera."); }
+  });
+
+  document.getElementById("micOnBtn").addEventListener("click", async () => {
+    try { await LinkdNLiveKit.enableMicrophone(true); setControlStatus("Microphone on."); }
+    catch (err) { console.error(err); setControlStatus(err.message || "Could not enable microphone."); }
+  });
+
+  document.getElementById("micOffBtn").addEventListener("click", async () => {
+    try { await LinkdNLiveKit.enableMicrophone(false); setControlStatus("Microphone off."); }
+    catch (err) { console.error(err); setControlStatus(err.message || "Could not disable microphone."); }
+  });
+
+  init();
+</script>
+</body>
+</html>

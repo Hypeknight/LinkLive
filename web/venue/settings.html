@@ -1,1 +1,210 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Venue Settings</title><link rel="stylesheet" href="/common/app.css"><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Venue Settings</h2><p class="notice">Live venue settings page scaffold.</p></div></div><script>menu.innerHTML=LinkdNNav.venue();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venue Settings</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/venue-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="form-card" style="margin-top:20px;">
+      <form id="settingsForm">
+        <div class="form-row">
+          <div>
+            <label>Venue Name</label>
+            <input id="venue_name" required>
+          </div>
+          <div>
+            <label>Active Email</label>
+            <input id="active_email" type="email" required>
+          </div>
+        </div>
+
+        <label style="margin-top:14px;">Street Address</label>
+        <input id="street_address">
+
+        <div class="form-row" style="margin-top:14px;">
+          <div>
+            <label>City</label>
+            <input id="city">
+          </div>
+          <div>
+            <label>State</label>
+            <input id="state" maxlength="2">
+          </div>
+        </div>
+
+        <label style="margin-top:14px;">ZIP</label>
+        <input id="zip">
+
+        <div class="form-row" style="margin-top:14px;">
+          <div>
+            <label>Contact Name</label>
+            <input id="during_hours_contact_name">
+          </div>
+          <div>
+            <label>Contact Phone</label>
+            <input id="during_hours_contact_phone">
+          </div>
+        </div>
+
+        <label style="margin-top:14px;">Description</label>
+        <textarea id="description"></textarea>
+
+        <div class="form-row" style="margin-top:14px;">
+          <div>
+            <label>Patron Pulse Enabled</label>
+            <select id="patron_pulse_enabled">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div>
+            <label>Public Visibility</label>
+            <select id="public_visibility">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-top:14px;">
+          <div>
+            <label>Allow Outgoing Messages</label>
+            <select id="allow_outgoing_messages">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div>
+            <label>Require Schedule Approval</label>
+            <select id="require_schedule_approval">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top:18px;">
+          <button type="submit">Save Settings</button>
+        </div>
+      </form>
+      <p id="settingsStatus" class="notice" style="display:none;margin-top:14px;"></p>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNVenueShell.render("Venue Settings", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNVenueShell.venueNav();
+
+  let venueId = null;
+
+  function getValue(id) {
+    const el = document.getElementById(id);
+    if (!el) throw new Error(`Missing form field: ${id}`);
+    return (el.value || "").trim();
+  }
+
+  function boolValue(id) {
+    return document.getElementById(id).value === "true";
+  }
+
+  function showStatus(msg) {
+    const el = document.getElementById("settingsStatus");
+    el.style.display = "block";
+    el.textContent = msg;
+  }
+
+  async function init() {
+    try {
+      const profile = await LinkdNVenueShell.requireVenueAccess();
+      if (!profile) return;
+      const venue = await LinkdNVenueShell.getActiveVenue(profile);
+      if (!venue) throw new Error("No venue found for this account.");
+      venueId = venue.id;
+
+      const supabase = LinkdNSupabase.getClient();
+      const { data: settings } = await supabase
+        .from("venue_settings")
+        .select("*")
+        .eq("venue_id", venue.id)
+        .maybeSingle();
+
+      document.getElementById("venue_name").value = venue.name || "";
+      document.getElementById("active_email").value = venue.active_email || "";
+      document.getElementById("street_address").value = venue.street_address || "";
+      document.getElementById("city").value = venue.city || "";
+      document.getElementById("state").value = venue.state || "";
+      document.getElementById("zip").value = venue.zip || "";
+      document.getElementById("during_hours_contact_name").value = venue.during_hours_contact_name || "";
+      document.getElementById("during_hours_contact_phone").value = venue.during_hours_contact_phone || "";
+      document.getElementById("description").value = venue.description || "";
+
+      document.getElementById("patron_pulse_enabled").value = String(settings?.patron_pulse_enabled ?? true);
+      document.getElementById("public_visibility").value = String(settings?.public_visibility ?? false);
+      document.getElementById("allow_outgoing_messages").value = String(settings?.allow_outgoing_messages ?? false);
+      document.getElementById("require_schedule_approval").value = String(settings?.require_schedule_approval ?? true);
+
+      LinkdNVenueShell.setStatus("Venue settings loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNVenueShell.setStatus(err.message || "Could not load settings.");
+    }
+  }
+
+  document.getElementById("settingsForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showStatus("Saving settings...");
+    try {
+      const supabase = LinkdNSupabase.getClient();
+
+      const venuePayload = {
+        name: getValue("venue_name"),
+        active_email: getValue("active_email"),
+        street_address: getValue("street_address"),
+        city: getValue("city"),
+        state: getValue("state").toUpperCase(),
+        zip: getValue("zip"),
+        during_hours_contact_name: getValue("during_hours_contact_name"),
+        during_hours_contact_phone: getValue("during_hours_contact_phone"),
+        description: getValue("description"),
+      };
+
+      const { error: venueError } = await supabase
+        .from("venues")
+        .update(venuePayload)
+        .eq("id", venueId);
+      if (venueError) throw venueError;
+
+      const settingsPayload = {
+        venue_id: venueId,
+        patron_pulse_enabled: boolValue("patron_pulse_enabled"),
+        public_visibility: boolValue("public_visibility"),
+        allow_outgoing_messages: boolValue("allow_outgoing_messages"),
+        require_schedule_approval: boolValue("require_schedule_approval"),
+      };
+
+      const { error: settingsError } = await supabase
+        .from("venue_settings")
+        .upsert(settingsPayload, { onConflict: "venue_id" });
+      if (settingsError) throw settingsError;
+
+      showStatus("Venue settings saved.");
+      LinkdNVenueShell.setStatus("Venue settings saved.");
+    } catch (err) {
+      console.error(err);
+      showStatus(err.message || "Could not save settings.");
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>

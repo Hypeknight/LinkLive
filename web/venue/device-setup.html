@@ -1,1 +1,133 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Device Setup</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.7/livekit-client.umd.js"></script><script src="/common/config.js?v=v2full"></script><script src="/common/livekit.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="form-card"><h2>Device Setup</h2><p id="status" class="notice">Grant access, then save devices.</p><div class="form-actions"><button type="button" id="grant">Allow Camera & Mic Access</button><button type="button" id="refresh">Refresh Devices</button><button type="button" id="save">Save Devices</button></div><div class="form-row" style="margin-top:16px"><div><label>Camera</label><select id="camera"></select></div><div><label>Audio</label><select id="audio"></select></div></div></div></div><script>menu.innerHTML=LinkdNNav.venue();function setStatus(m){status.textContent=m}async function load(){try{const {videoInputs,audioInputs}=await LinkdNLiveKit.listDevices();camera.innerHTML=videoInputs.map((d,i)=>`<option value="${d.deviceId}">${d.label||('Camera '+(i+1))}</option>`).join('')||'<option value="">No cameras</option>';audio.innerHTML=audioInputs.map((d,i)=>`<option value="${d.deviceId}">${d.label||('Audio '+(i+1))}</option>`).join('')||'<option value="">No audio</option>';const saved=JSON.parse(localStorage.getItem('linkdn_device_setup')||'{}');if(saved.cameraId) camera.value=saved.cameraId;if(saved.audioId) audio.value=saved.audioId;setStatus('Devices loaded.');}catch(err){console.error(err);setStatus(err.message||'Could not load devices.')}}grant.onclick=async()=>{try{await navigator.mediaDevices.getUserMedia({video:true,audio:true});await load();setStatus('Permission granted.')}catch(err){setStatus(err.message||'Permission denied.')}};refresh.onclick=load;save.onclick=()=>{localStorage.setItem('linkdn_device_setup',JSON.stringify({cameraId:camera.value,audioId:audio.value,cameraName:camera.options[camera.selectedIndex]?.text||'',audioName:audio.options[audio.selectedIndex]?.text||''}));setStatus('Saved preferred devices.');};load();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venue Device Setup</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.7/livekit-client.umd.js"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/livekit.js"></script>
+  <script src="/common/venue-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="form-card" style="margin-top:20px;">
+      <p id="deviceStatus" class="notice">Click allow first, then refresh and save devices.</p>
+
+      <div class="form-actions">
+        <button type="button" id="grantBtn">Allow Camera & Mic Access</button>
+        <button type="button" id="refreshBtn">Refresh Devices</button>
+        <button type="button" id="saveBtn">Save Devices</button>
+      </div>
+
+      <div class="form-row" style="margin-top:16px;">
+        <div>
+          <label>Camera</label>
+          <select id="cameraSelect"></select>
+        </div>
+        <div>
+          <label>Audio Input</label>
+          <select id="audioSelect"></select>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNVenueShell.render("Device Setup", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNVenueShell.venueNav();
+
+  let venueId = null;
+  const deviceStatus = document.getElementById("deviceStatus");
+  const cameraSelect = document.getElementById("cameraSelect");
+  const audioSelect = document.getElementById("audioSelect");
+
+  function setDeviceStatus(msg) {
+    deviceStatus.textContent = msg;
+  }
+
+  async function loadDevices() {
+    try {
+      const { videoInputs, audioInputs } = await LinkdNLiveKit.listDevices();
+      cameraSelect.innerHTML = videoInputs.length
+        ? videoInputs.map((d, i) => `<option value="${d.deviceId}">${d.label || `Camera ${i+1}`}</option>`).join("")
+        : `<option value="">No cameras found</option>`;
+
+      audioSelect.innerHTML = audioInputs.length
+        ? audioInputs.map((d, i) => `<option value="${d.deviceId}">${d.label || `Audio Input ${i+1}`}</option>`).join("")
+        : `<option value="">No audio inputs found</option>`;
+
+      const saved = JSON.parse(localStorage.getItem("linkdn_device_setup") || "{}");
+      if (saved.cameraId) cameraSelect.value = saved.cameraId;
+      if (saved.audioId) audioSelect.value = saved.audioId;
+
+      setDeviceStatus("Devices loaded.");
+    } catch (err) {
+      console.error(err);
+      setDeviceStatus(err.message || "Could not load devices.");
+    }
+  }
+
+  async function init() {
+    try {
+      const profile = await LinkdNVenueShell.requireVenueAccess();
+      if (!profile) return;
+      const venue = await LinkdNVenueShell.getActiveVenue(profile);
+      if (!venue) throw new Error("No venue found for this account.");
+      venueId = venue.id;
+      LinkdNVenueShell.setStatus(`Configuring devices for ${venue.name}`);
+      await loadDevices();
+    } catch (err) {
+      console.error(err);
+      LinkdNVenueShell.setStatus(err.message || "Could not load device setup.");
+    }
+  }
+
+  document.getElementById("grantBtn").addEventListener("click", async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      await loadDevices();
+      setDeviceStatus("Permission granted and devices loaded.");
+    } catch (err) {
+      console.error(err);
+      setDeviceStatus(err.message || "Permission denied.");
+    }
+  });
+
+  document.getElementById("refreshBtn").addEventListener("click", loadDevices);
+
+  document.getElementById("saveBtn").addEventListener("click", async () => {
+    try {
+      const supabase = LinkdNSupabase.getClient();
+
+      const localConfig = {
+        cameraId: cameraSelect.value,
+        audioId: audioSelect.value,
+        cameraName: cameraSelect.options[cameraSelect.selectedIndex]?.text || "",
+        audioName: audioSelect.options[audioSelect.selectedIndex]?.text || ""
+      };
+      localStorage.setItem("linkdn_device_setup", JSON.stringify(localConfig));
+
+      const { error } = await supabase.from("venue_device_preferences").upsert({
+        venue_id: venueId,
+        preferred_camera_id: null,
+        preferred_audio_input_id: null,
+        preferred_audio_interface_id: null
+      }, { onConflict: "venue_id" });
+
+      if (error) throw error;
+      setDeviceStatus("Device preferences saved locally and venue profile touched.");
+    } catch (err) {
+      console.error(err);
+      setDeviceStatus(err.message || "Could not save device preferences.");
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>

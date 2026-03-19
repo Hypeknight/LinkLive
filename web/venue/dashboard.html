@@ -1,1 +1,72 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Venue Dashboard</title><link rel="stylesheet" href="/common/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/common/config.js?v=v2full"></script><script src="/common/supabase.js?v=v2full"></script><script src="/common/auth-live.js?v=v2full"></script><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="form-card"><h2>Venue Dashboard</h2><p class="notice">Select a venue from the owner dashboard/workers flow. This page assumes you already have venue access.</p></div></div><script>menu.innerHTML=LinkdNNav.venue();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venue Dashboard</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/venue-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="feature-grid" style="margin-top:20px;">
+      <div class="feature-card">
+        <h3>Venue</h3>
+        <p><strong>Name:</strong> <span id="venueName">-</span></p>
+        <p><strong>Status:</strong> <span id="venueStatus">-</span></p>
+        <p><strong>Searchable:</strong> <span id="venueSearchable">-</span></p>
+      </div>
+      <div class="feature-card">
+        <h3>Contact</h3>
+        <p><strong>Address:</strong> <span id="venueAddress">-</span></p>
+        <p><strong>Contact:</strong> <span id="venueContact">-</span></p>
+        <p><strong>Email:</strong> <span id="venueEmail">-</span></p>
+      </div>
+      <div class="feature-card">
+        <h3>Quick Actions</h3>
+        <div class="form-actions" style="flex-direction:column;">
+          <a href="/venue/settings.html"><button type="button">Venue Settings</button></a>
+          <a href="/venue/device-setup.html"><button type="button">Device Setup</button></a>
+          <a href="/venue/local-controls.html"><button type="button">Local Controls</button></a>
+          <a href="/venue/workers.html"><button type="button">Workers</button></a>
+          <a href="/venue/metrics.html"><button type="button">Metrics</button></a>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNVenueShell.render("Venue Dashboard", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNVenueShell.venueNav();
+
+  async function init() {
+    try {
+      const profile = await LinkdNVenueShell.requireVenueAccess();
+      if (!profile) return;
+      const venue = await LinkdNVenueShell.getActiveVenue(profile);
+      if (!venue) throw new Error("No venue found for this account.");
+
+      document.getElementById("venueName").textContent = venue.name || "-";
+      document.getElementById("venueStatus").textContent = venue.venue_status || "-";
+      document.getElementById("venueSearchable").textContent = venue.searchable ? "Yes" : "No";
+      document.getElementById("venueAddress").textContent =
+        [venue.street_address, venue.city, venue.state, venue.zip].filter(Boolean).join(", ") || "-";
+      document.getElementById("venueContact").textContent =
+        [venue.during_hours_contact_name, venue.during_hours_contact_phone].filter(Boolean).join(" / ") || "-";
+      document.getElementById("venueEmail").textContent = venue.active_email || "-";
+
+      LinkdNVenueShell.setStatus("Venue dashboard loaded.");
+    } catch (err) {
+      console.error(err);
+      LinkdNVenueShell.setStatus(err.message || "Could not load venue dashboard.");
+    }
+  }
+  init();
+</script>
+</body>
+</html>

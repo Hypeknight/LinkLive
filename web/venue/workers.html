@@ -1,1 +1,149 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Venue Workers</title><link rel="stylesheet" href="/common/app.css"><script src="/common/nav.js?v=v2full"></script></head><body><div class="page-wrap"><div id="menu"></div><div class="card"><h2>Venue Workers</h2><p class="notice">Venue worker management scaffold.</p></div></div><script>menu.innerHTML=LinkdNNav.venue();</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venue Workers</title>
+  <link rel="stylesheet" href="/common/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/config.js"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/auth-live.js"></script>
+  <script src="/common/nav.js"></script>
+  <script src="/common/venue-shell.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const bodyHtml = `
+    <div class="form-card" style="margin-top:20px;">
+      <form id="workerForm">
+        <label>Worker Email</label>
+        <input id="worker_email" type="email" required>
+
+        <label style="margin-top:14px;">Access Level</label>
+        <select id="access_level">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+
+        <div class="form-actions" style="margin-top:16px;">
+          <button type="submit">Assign Worker</button>
+        </div>
+      </form>
+      <p id="workerStatus" class="notice" style="display:none;margin-top:14px;"></p>
+    </div>
+
+    <div class="table-wrap" style="margin-top:24px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Access</th>
+            <th>Active</th>
+          </tr>
+        </thead>
+        <tbody id="workersTable"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById("app").innerHTML = LinkdNVenueShell.render("Venue Workers", bodyHtml);
+  document.getElementById("menu").innerHTML = LinkdNVenueShell.venueNav();
+
+  let venueId = null;
+  let currentProfile = null;
+
+  function showWorkerStatus(msg) {
+    const el = document.getElementById("workerStatus");
+    el.style.display = "block";
+    el.textContent = msg;
+  }
+
+  async function loadWorkers() {
+    const supabase = LinkdNSupabase.getClient();
+    const { data, error } = await supabase
+      .from("venue_workers")
+      .select(`
+        access_level,
+        active,
+        profiles:profile_id (
+          email,
+          role
+        )
+      `)
+      .eq("venue_id", venueId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const tbody = document.getElementById("workersTable");
+    tbody.innerHTML = (data && data.length)
+      ? data.map(r => `
+          <tr>
+            <td>${r.profiles?.email || "-"}</td>
+            <td>${r.profiles?.role || "-"}</td>
+            <td>${r.access_level || "-"}</td>
+            <td>${r.active ? "Yes" : "No"}</td>
+          </tr>
+        `).join("")
+      : `<tr><td colspan="4">No workers assigned.</td></tr>`;
+  }
+
+  async function init() {
+    try {
+      currentProfile = await LinkdNVenueShell.requireVenueAccess();
+      if (!currentProfile) return;
+      const venue = await LinkdNVenueShell.getActiveVenue(currentProfile);
+      if (!venue) throw new Error("No venue found for this account.");
+      venueId = venue.id;
+      await loadWorkers();
+      LinkdNVenueShell.setStatus(`Workers loaded for ${venue.name}`);
+    } catch (err) {
+      console.error(err);
+      LinkdNVenueShell.setStatus(err.message || "Could not load workers.");
+    }
+  }
+
+  document.getElementById("workerForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showWorkerStatus("Assigning worker...");
+    try {
+      const supabase = LinkdNSupabase.getClient();
+      const email = (document.getElementById("worker_email").value || "").trim().toLowerCase();
+      const accessLevel = document.getElementById("access_level").value;
+
+      const { data: workerProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id,email")
+        .eq("email", email)
+        .single();
+
+      if (profileError) throw new Error("Worker profile not found. Create the user first.");
+
+      const { error } = await supabase
+        .from("venue_workers")
+        .upsert({
+          venue_id: venueId,
+          profile_id: workerProfile.id,
+          access_level: accessLevel,
+          active: true,
+          assigned_by: currentProfile.id
+        }, { onConflict: "venue_id,profile_id" });
+
+      if (error) throw error;
+
+      showWorkerStatus("Worker assigned.");
+      document.getElementById("workerForm").reset();
+      await loadWorkers();
+    } catch (err) {
+      console.error(err);
+      showWorkerStatus(err.message || "Could not assign worker.");
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>
