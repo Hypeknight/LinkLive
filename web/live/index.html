@@ -2,62 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Show Dashboard | Live Venue Control</title>
-  <link rel="stylesheet" href="assets/css/app.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/config.js"></script>
-  <script defer src="assets/js/app.js"></script>
+  <meta http-equiv="refresh" content="0; url=/login.html">
+  <title>Live Venue Control</title>
 </head>
-<body>
-<div class="layout">
-  <aside class="sidebar">
-    <div class="brand">Live Venue Control</div>
-    <div class="sub">Moderator + live operations stack</div>
-    <div class="badge">Venue: <span id="venue-badge"></span></div>
-    <nav class="nav">
-      <a href="index.html" class="active">Show Dashboard</a>
-      <a href="rooms.html" >Rooms</a>
-      <a href="scheduling.html" >Scheduling</a>
-      <a href="ops.html" >Ops</a>
-      <a href="patron-pulse.html" >Patron Pulse</a>
-      <a href="local-controls.html" >Local Controls</a>
-      <a href="device-settings.html" >Device Settings</a>
-    </nav>
-  </aside>
-  <main class="main">
-    <div class="header">
-      <div class="title">
-        <h1>Show Dashboard</h1>
-        <p>Live operational overview for rooms, schedules, pulse, devices, and ops notes.</p>
-      </div>
-      <div class="meta">
-        <div id="connection-state" class="connection offline"></div>
-      </div>
-    </div>
-    <div id="flash-host" class="flash-host"></div>
-    <section data-page="dashboard" class="grid">
-  <div class="grid cols-4 stats">
-    <div class="card"><div class="muted">Rooms</div><div class="stat" data-stat="rooms">0</div><div class="helper">Total venue rooms</div></div>
-    <div class="card"><div class="muted">Live Rooms</div><div class="stat" data-stat="liveRooms">0</div><div class="helper">Currently active spaces</div></div>
-    <div class="card"><div class="muted">Upcoming Blocks</div><div class="stat" data-stat="upcoming">0</div><div class="helper">Future scheduled items</div></div>
-    <div class="card"><div class="muted">Devices</div><div class="stat" data-stat="devices">0</div><div class="helper">Cameras + microphones</div></div>
-  </div>
-  <div class="grid cols-2">
-    <div class="card"><h3>Average Pulse</h3><div class="stat" data-stat="avgPulse">0%</div><div class="helper">Latest venue pulse average</div></div>
-    <div class="card"><h3>How this page works</h3><div class="helper">This dashboard reads the same tables controlled by the moderator side. When rooms, schedules, ops notes, or pulse entries change, this page refreshes in real time when Supabase Realtime is enabled.</div></div>
-  </div>
-  <div class="grid cols-2">
-    <div class="card"><h3>Rooms</h3><table><thead><tr><th>Name</th><th>Zone</th><th>Status</th><th>Capacity</th><th>Updated</th></tr></thead><tbody id="live-rooms"></tbody></table></div>
-    <div class="card"><h3>Schedule</h3><table><thead><tr><th>Title</th><th>Room</th><th>Start</th><th>End</th><th>Lead</th></tr></thead><tbody id="upcoming-schedule"></tbody></table></div>
-  </div>
-  <div class="grid cols-2">
-    <div class="card"><h3>Recent Patron Pulse</h3><table><thead><tr><th>Room</th><th>Pulse</th><th>Crowd</th><th>Energy</th><th>Created</th></tr></thead><tbody id="recent-pulse"></tbody></table></div>
-    <div class="card"><h3>Recent Ops Notes</h3><table><thead><tr><th>Title</th><th>Room</th><th>Priority</th><th>Status</th><th>Created</th></tr></thead><tbody id="recent-notes"></tbody></table></div>
-  </div>
-</section>
-  </main>
-</div>
-
-</body>
+<body></body>
 </html>

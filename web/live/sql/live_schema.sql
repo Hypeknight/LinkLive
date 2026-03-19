@@ -1,7 +1,14 @@
--- Core tables for live moderation and venue operations.
--- Run this in Supabase SQL editor.
-
 create extension if not exists pgcrypto;
+
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  full_name text,
+  role text not null default 'venue' check (role in ('admin','moderator','ops','venue')),
+  venue_id text not null default 'demo-venue-1',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
 create table if not exists public.rooms (
   id uuid primary key default gen_random_uuid(),
@@ -28,15 +35,10 @@ create table if not exists public.devices (
   unique (venue_id, browser_device_id)
 );
 
-alter table public.rooms
-  drop constraint if exists rooms_assigned_camera_fk;
-alter table public.rooms
-  drop constraint if exists rooms_assigned_mic_fk;
-
-alter table public.rooms
-  add constraint rooms_assigned_camera_fk foreign key (assigned_camera_id) references public.devices(id) on delete set null;
-alter table public.rooms
-  add constraint rooms_assigned_mic_fk foreign key (assigned_mic_id) references public.devices(id) on delete set null;
+alter table public.rooms drop constraint if exists rooms_assigned_camera_fk;
+alter table public.rooms drop constraint if exists rooms_assigned_mic_fk;
+alter table public.rooms add constraint rooms_assigned_camera_fk foreign key (assigned_camera_id) references public.devices(id) on delete set null;
+alter table public.rooms add constraint rooms_assigned_mic_fk foreign key (assigned_mic_id) references public.devices(id) on delete set null;
 
 create table if not exists public.schedules (
   id uuid primary key default gen_random_uuid(),
@@ -76,6 +78,7 @@ create table if not exists public.ops_notes (
   updated_at timestamptz not null default now()
 );
 
+create index if not exists idx_profiles_venue_id on public.profiles(venue_id);
 create index if not exists idx_rooms_venue_id on public.rooms(venue_id);
 create index if not exists idx_devices_venue_id on public.devices(venue_id);
 create index if not exists idx_schedules_venue_id on public.schedules(venue_id);
@@ -83,31 +86,19 @@ create index if not exists idx_patron_pulse_venue_id on public.patron_pulse(venu
 create index if not exists idx_ops_notes_venue_id on public.ops_notes(venue_id);
 
 create or replace function public.touch_updated_at()
-returns trigger
-language plpgsql
-as $$
+returns trigger language plpgsql as $$
 begin
   new.updated_at = now();
   return new;
-end;
-$$;
+end; $$;
 
+drop trigger if exists trg_profiles_touch_updated_at on public.profiles;
+create trigger trg_profiles_touch_updated_at before update on public.profiles for each row execute function public.touch_updated_at();
 drop trigger if exists trg_rooms_touch_updated_at on public.rooms;
-create trigger trg_rooms_touch_updated_at
-before update on public.rooms
-for each row execute function public.touch_updated_at();
-
+create trigger trg_rooms_touch_updated_at before update on public.rooms for each row execute function public.touch_updated_at();
 drop trigger if exists trg_devices_touch_updated_at on public.devices;
-create trigger trg_devices_touch_updated_at
-before update on public.devices
-for each row execute function public.touch_updated_at();
-
+create trigger trg_devices_touch_updated_at before update on public.devices for each row execute function public.touch_updated_at();
 drop trigger if exists trg_schedules_touch_updated_at on public.schedules;
-create trigger trg_schedules_touch_updated_at
-before update on public.schedules
-for each row execute function public.touch_updated_at();
-
+create trigger trg_schedules_touch_updated_at before update on public.schedules for each row execute function public.touch_updated_at();
 drop trigger if exists trg_ops_notes_touch_updated_at on public.ops_notes;
-create trigger trg_ops_notes_touch_updated_at
-before update on public.ops_notes
-for each row execute function public.touch_updated_at();
+create trigger trg_ops_notes_touch_updated_at before update on public.ops_notes for each row execute function public.touch_updated_at();

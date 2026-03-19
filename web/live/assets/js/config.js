@@ -1,8 +1,13 @@
 window.APP_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'REPLACE_WITH_SUPABASE_URL',
+  supabaseAnonKey: 'REPLACE_WITH_SUPABASE_ANON_KEY',
   venueId: 'demo-venue-1',
-  realtime: true,
-  useMockWhenUnconfigured: true,
-  appName: 'Live Venue Control'
+  appName: 'Live Venue Control',
+  venueName: 'Demo Venue',
+  timezone: 'America/Chicago',
+  moderatorRoles: ['admin', 'moderator', 'ops'],
+  venueRoles: ['admin', 'moderator', 'ops', 'venue'],
+  allowVenuePublicRead: false,
+  defaultRouteForModerator: '/moderator/dashboard.html',
+  defaultRouteForVenue: '/venue/dashboard.html'
 };
