@@ -1,5 +1,5 @@
 (function () {
-  const db = window.LINKDN_CONFIG;
+  const db = window.LiveDB;
   const ui = window.LinkdNUI;
   const auth = window.LinkdNV2Auth;
   let cached = { rooms: [], devices: [], schedules: [], notes: [], pulse: [] };
