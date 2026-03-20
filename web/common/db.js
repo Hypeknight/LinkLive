@@ -12,8 +12,8 @@
   const cfg = window.LINKDN_CONFIG;
 
   const client = window.supabase.createClient(
-    cfg.supabaseUrl,
-    cfg.supabaseAnonKey
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_ANON_KEY
   );
 
   const LiveDB = {
