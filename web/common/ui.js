@@ -38,4 +38,32 @@ window.LinkdNUI = {
       location.href = '/auth/login.html';
     }));
   }
+  
+};
+window.LiveUI = window.LiveUI || {};
+
+window.LiveUI.flash = function (message, type = 'info') {
+  let box = document.getElementById('live-flash');
+
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'live-flash';
+    box.style.position = 'fixed';
+    box.style.top = '20px';
+    box.style.right = '20px';
+    box.style.zIndex = '9999';
+    box.style.padding = '12px 16px';
+    box.style.borderRadius = '8px';
+    box.style.background = '#1f2937';
+    box.style.color = '#fff';
+    document.body.appendChild(box);
+  }
+
+  box.textContent = message;
+  box.style.display = 'block';
+  box.style.background = type === 'error' ? '#7f1d1d' : '#1f2937';
+
+  setTimeout(() => {
+    box.style.display = 'none';
+  }, 3000);
 };
