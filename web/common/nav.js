@@ -10,6 +10,7 @@ window.LinkdNNav = {
     </nav>`; },
   admin() { return `<nav class="app-nav">
     <a href="/admin/dashboard.html">Dashboard</a>
+    <a href="/live/moderator/dashboard.html">Showtime</a>
     <a href="/admin/owners.html">Owners</a>
     <a href="/admin/venues.html">Venues</a>
     <a href="/admin/workers.html">Workers</a>

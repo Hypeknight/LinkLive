@@ -1,1 +1,96 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Device Settings</title><link rel="stylesheet" href="/assets/css/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/assets/js/config.js"></script><script src="/assets/js/supabase.js"></script><script src="/assets/js/common.js"></script><script src="/assets/js/auth.js"></script><script src="/assets/js/moderator.js"></script></head><body data-page="moderator-devices"><div class="shell"><aside class="sidebar"><div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Moderator side</div></div></div><nav class="nav"><a href="/moderator/dashboard.html">Dashboard</a><a href="/moderator/rooms.html">Rooms</a><a href="/moderator/scheduling.html">Scheduling</a><a href="/moderator/ops.html">Ops</a><a href="/moderator/patron-pulse.html">Patron Pulse</a><a href="/moderator/local-controls.html">Local Controls</a><a class="active" href="/moderator/device-settings.html">Device Settings</a></nav></aside><main class="main"><header class="header"><div><h1>Device Settings</h1><p>Register, edit, delete, and sync browser devices.</p></div><div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline"></div><button id="logout-button" class="secondary">Logout</button></div></header><div id="flash-host"></div><section class="grid cols-2"><article class="card"><h3 id="device-form-title">Add Device</h3><form id="device-form" class="stack"><label>Label<input name="label" required></label><label>Kind<select name="device_kind"><option value="camera">camera</option><option value="microphone">microphone</option></select></label><label>Browser Device ID<input name="browser_device_id"></label><label>Status<select name="status"><option value="active">active</option><option value="inactive">inactive</option></select></label><div class="button-row"><button type="submit">Save Device</button><button type="button" class="secondary" id="device-form-reset">Reset</button><button type="button" class="secondary" id="scan-browser-devices">Scan Browser Devices</button></div></form></article><article class="card"><h3>Devices</h3><table><thead><tr><th>Label</th><th>Kind</th><th>Browser ID</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead><tbody id="devices-table"></tbody></table></article></section></main></div></body></html>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Device Settings</title>
+        <link rel="stylesheet" href="/common/app.css">
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="/common/config.js"></script>
+        <script src="/common/supabase.js"></script>
+        <!--- <script src="/assets/js/common.js"></script> --->
+        <script src="/common/auth.js"></script>
+        <script src="/assets/js/venue.js"></script>
+    </head>
+    <body data-page="moderator-devices">
+        <div class="shell">
+            <aside class="sidebar">
+                <div class="brand-row">
+                    <span class="brand-mark"></span>
+                    <div>
+                        <div class="brand" data-app-name></div>
+                        <div class="sub">Moderator side</div>
+                    </div>
+                </div>
+                <nav class="nav">
+            <a href="/live/moderator/dashboard.html">Dashboard</a>
+            <a href="/live/moderator/rooms.html">Rooms</a>
+            <a href="/live/moderator/scheduling.html">Scheduling</a>
+            <a href="/live/moderator/ops.html">Ops</a>
+            <a href="/live/moderator/patron-pulse.html">Patron Pulse</a>
+            <a href="/live/moderator/local-controls.html">Local Controls</a>
+            <a class="active" href="/live/moderator/device-settings.html">Device Settings</a>
+            <!-- <a href="/venue/dashboard.html">Venue View</a> -->
+        </nav>
+            </aside>
+            <main class="main">
+                <header class="header">
+                    <div>
+                        <h1>Device Settings</h1>
+                        <p>Register, edit, delete, and sync browser devices.</p>
+                    </div>
+                    <div class="header-right">
+                        <div id="current-user"></div>
+                        <div id="connection-state" class="connection offline"></div>
+                        <button id="logout-button" class="secondary">Logout</button>
+                    </div>
+                </header>
+                <div id="flash-host"></div>
+                <section class="grid cols-2">
+                    <article class="card">
+                        <h3 id="device-form-title">Add Device</h3>
+                        <form id="device-form" class="stack">
+                            <label>Label
+                                <input name="label" required>
+                            </label>
+                            <label>Kind
+                                <select name="device_kind">
+                                    <option value="camera">camera</option>
+                                    <option value="microphone">microphone</option>
+                                </select>
+                            </label>
+                            <label>Browser Device ID
+                                <input name="browser_device_id">
+                            </label>
+                            <label>Status
+                                <select name="status">
+                                    <option value="active">active</option>
+                                    <option value="inactive">inactive</option>
+                                </select>
+                            </label>
+                            <div class="button-row">
+                                <button type="submit">Save Device</button>
+                                <button type="button" class="secondary" id="device-form-reset">Reset</button>
+                                <button type="button" class="secondary" id="scan-browser-devices">Scan Browser Devices</button>
+                            </div>
+                        </form>
+                    </article>
+                    <article class="card">
+                        <h3>Devices</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Label</th>
+                                    <th>Kind</th>
+                                    <th>Browser ID</th>
+                                    <th>Status</th>
+                                    <th>Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devices-table"></tbody>
+                        </table>
+                    </article>
+                </section>
+            </main>
+        </div>
