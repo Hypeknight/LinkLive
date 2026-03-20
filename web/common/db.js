@@ -1,5 +1,5 @@
 (function () {
-  if (!window.APP_CONFIG) {
+  if (!window.LINKDN_CONFIG) {
     console.error("APP_CONFIG is missing. Make sure config.js loads first.");
     return;
   }
@@ -9,7 +9,7 @@
     return;
   }
 
-  const cfg = window.APP_CONFIG;
+  const cfg = window.LINKDN_CONFIG;
 
   const client = window.supabase.createClient(
     cfg.supabaseUrl,
