@@ -1,4 +1,4 @@
-/*window.LinkdNV2Auth = (() => {
+window.LinkdNV2Auth = (() => {
   function sb() {
     if (!window.LinkdNV2Supabase) throw new Error('Supabase client not initialized.');
     return window.LinkdNV2Supabase.getClient();
@@ -18,7 +18,7 @@
   }
   return { signIn, signUp, getUser, signOut };
 })();
-*/
+
 (function () {
   const db = window.LiveDB;
 
