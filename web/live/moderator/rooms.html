@@ -35,70 +35,86 @@
         </nav>
             </aside>
             <main class="main">
-                <header class="header">
-                    <div>
-                        <h1>Rooms</h1>
-                        <p>Create rooms, assign camera/mic devices, and change live status.</p>
-                    </div>
-                    <div class="header-right">
-                        <div id="current-user"></div>
-                        <div id="connection-state" class="connection offline"></div>
-                        <button id="logout-button" class="secondary">Logout</button>
-                    </div>
-                </header>
-                <div id="flash-host"></div>
-                <section class="grid cols-2">
-                    <article class="card">
-                        <h3 id="room-form-title">Add Room</h3>
-                        <form id="room-form" class="stack">
-                            <label>Name
-                                <input name="name" required />
-                            </label >
-                            "<label>Zone
-                                "<input name = "zone" />
-                            </label >
-                            "<label>Capacity
-                                "<input type = "number" name = "capacity" min = "0" value = "0" />
-                            </label >
-                            "<label>Status
-                                "<select name = "status" >
-                                    "<option value = "scheduled" >scheduled</option >
-                                    "<option value = "live" >live</option >
-                                    "<option value = "completed" >completed</option >
-                                    "<option value = "cancelled" >cancelled</option >
-                                </select >
-                            </label >
-                            "<label>Assigned Camera
-                                "<select name = "assigned_camera_id" ></select >
-                            </label >
-                            "<label>Assigned Microphone
-                                "<select name = "assigned_mic_id" ></select >
-                            </label >
-                            "<div class = "button-row" >
-                                "<button type = "submit" >Save Room< /button >
-                                "<button type = "button" class = "secondary" id = "room-form-reset" >Reset< /button >
-                            </div >
-                        </form >
-                    </article >
-                    "<article class = "card" >
-                        "<h3>Rooms< /h3 >
-                        "<table >
-                            "<thead >
-                                "<tr >
-                                    "<th >Name< /th >
-                                    "<th >Zone< /th >
-                                    "<th >Capacity< /th >
-                                    "<th >Status< /th >
-                                    "<th >Camera< /th >
-                                    "<th >Mic< /th >
-                                    "<th >Actions< /th >
-                                </tr >
-                            "</thead >
-                            "</tbody >
-                        "</table >
-                    "</article >
-                "</section >
-            "</main >
-        "</div >
-    "</body >
-"</html >
+  <header class="header">
+    <div>
+      <h1>Rooms</h1>
+      <p>Create rooms, assign camera/mic devices, and change live status.</p>
+    </div>
+    <div class="header-right">
+      <div id="current-user"></div>
+      <div id="connection-state" class="connection offline"></div>
+      <button id="logout-button" class="secondary">Logout</button>
+    </div>
+  </header>
+
+  <div id="flash-host"></div>
+
+  <section class="grid cols-2">
+    <article class="card">
+      <h3 id="room-form-title">Add Room</h3>
+      <form id="room-form" class="stack">
+        <label>
+          Name
+          <input name="name" required />
+        </label>
+
+        <label>
+          Zone
+          <input name="zone" />
+        </label>
+
+        <label>
+          Capacity
+          <input type="number" name="capacity" min="0" value="0" />
+        </label>
+
+        <label>
+          Status
+          <select name="status">
+            <option value="scheduled">scheduled</option>
+            <option value="live">live</option>
+            <option value="completed">completed</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+        </label>
+
+        <label>
+          Assigned Camera
+          <select name="assigned_camera_id"></select>
+        </label>
+
+        <label>
+          Assigned Microphone
+          <select name="assigned_mic_id"></select>
+        </label>
+
+        <div class="button-row">
+          <button type="submit">Save Room</button>
+          <button type="button" class="secondary" id="room-form-reset">Reset</button>
+        </div>
+      </form>
+    </article>
+
+    <article class="card">
+      <h3>Rooms</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Zone</th>
+            <th>Capacity</th>
+            <th>Status</th>
+            <th>Camera</th>
+            <th>Mic</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rooms-table-body">
+        </tbody>
+      </table>
+    </article>
+  </section>
+</main>
+        </div >
+    </body >
+</html >
