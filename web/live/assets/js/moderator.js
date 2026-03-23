@@ -66,22 +66,29 @@
     if (!form) return;
     setOptions(form.assigned_camera_id, cached.devices.filter(d => d.device_kind === 'camera'), 'Unassigned camera', 'id', 'label');
     setOptions(form.assigned_mic_id, cached.devices.filter(d => d.device_kind === 'microphone'), 'Unassigned mic', 'id', 'label');
+    //let editingId = form.dataset.editingId || '';
+    const tbody = document.getElementById('rooms-table-body');
+    if (!tbody) {
+    console.error('rooms-table-body not found');
+    return;
+}
     let editingId = form.dataset.editingId || '';
-    const tbody = document.getElementById('rooms-table');
-    tbody.innerHTML = cached.rooms.map(r => `<tr>
-      <td>${ui.esc(r.name)}</td>
-      <td>${ui.esc(r.zone || '—')}</td>
-      <td>${ui.esc(r.capacity)}</td>
-      <td>${ui.esc(r.status)}</td>
-      <td>${ui.esc(cached.devices.find(d => d.id === r.assigned_camera_id)?.label || '—')}</td>
-      <td>${ui.esc(cached.devices.find(d => d.id === r.assigned_mic_id)?.label || '—')}</td>
-      <td class="actions">
-        <button data-edit="${r.id}">Edit</button>
-        <button data-live="${r.id}">Go Live</button>
-        <button data-complete="${r.id}">Complete</button>
-        <button class="danger" data-delete="${r.id}">Delete</button>
-      </td>
-    </tr>`).join('') || `<tr><td colspan="7">No rooms found.</td></tr>`;
+
+  tbody.innerHTML = cached.rooms.map(r => `<tr>
+    <td>${ui.esc(r.name)}</td>
+    <td>${ui.esc(r.zone || '—')}</td>
+    <td>${ui.esc(r.capacity)}</td>
+    <td>${ui.esc(r.status)}</td>
+    <td>${ui.esc(cached.devices.find(d => d.id === r.assigned_camera_id)?.label || '—')}</td>
+    <td>${ui.esc(cached.devices.find(d => d.id === r.assigned_mic_id)?.label || '—')}</td>
+    <td class="actions">
+      <button data-edit="${r.id}">Edit</button>
+      <button data-live="${r.id}">Go Live</button>
+      <button data-complete="${r.id}">Complete</button>
+      <button class="danger" data-delete="${r.id}">Delete</button>
+    </td>
+  </tr>`).join('') || `<tr><td colspan="7">No rooms found.</td></tr>`;
+
 
     tbody.querySelectorAll('[data-edit]').forEach(btn => btn.onclick = () => {
       const r = cached.rooms.find(x => x.id === btn.dataset.edit);
@@ -149,7 +156,7 @@
     const form = document.getElementById('schedule-form');
     if (!form) return;
     setOptions(form.room_id, cached.rooms, 'Select room');
-    const tbody = document.getElementById('schedule-table');
+    const tbody = document.getElementById('schedule-table-body');
     tbody.innerHTML = cached.schedules.map(s => `<tr>
       <td>${ui.esc(s.title)}</td>
       <td>${ui.esc(ui.roomName(cached.rooms, s.room_id))}</td>
@@ -217,7 +224,11 @@
     const form = document.getElementById('ops-form');
     if (!form) return;
     setOptions(form.room_id, cached.rooms, 'General note');
-    const tbody = document.getElementById('ops-table');
+    const tbody = document.getElementById('ops-table-body');
+    if (!tbody) {
+      console.error('ops-table-body not found');
+      return;
+    }
     tbody.innerHTML = cached.notes.map(n => `<tr>
       <td>${ui.esc(n.title)}</td><td>${ui.esc(ui.roomName(cached.rooms, n.room_id))}</td><td>${ui.esc(n.priority)}</td><td>${ui.esc(n.status)}</td><td>${ui.esc(n.assigned_to || '—')}</td><td>${ui.fmtDate(n.created_at)}</td>
       <td class="actions"><button data-edit="${n.id}">Edit</button><button data-close="${n.id}">Close</button><button class="danger" data-delete="${n.id}">Delete</button></td>
@@ -276,7 +287,7 @@
     const form = document.getElementById('pulse-form');
     if (!form) return;
     setOptions(form.room_id, cached.rooms, 'Select room');
-    document.getElementById('pulse-table').innerHTML = cached.pulse.map(p => `<tr><td>${ui.esc(ui.roomName(cached.rooms, p.room_id))}</td><td>${ui.esc(p.pulse_score)}</td><td>${ui.esc(p.crowd_count)}</td><td>${ui.esc(p.energy_level)}</td><td>${ui.esc(p.source)}</td><td>${ui.fmtDate(p.created_at)}</td></tr>`).join('') || `<tr><td colspan="6">No pulse entries found.</td></tr>`;
+    document.getElementById('pulse-table-body').innerHTML = cached.pulse.map(p => `<tr><td>${ui.esc(ui.roomName(cached.rooms, p.room_id))}</td><td>${ui.esc(p.pulse_score)}</td><td>${ui.esc(p.crowd_count)}</td><td>${ui.esc(p.energy_level)}</td><td>${ui.esc(p.source)}</td><td>${ui.fmtDate(p.created_at)}</td></tr>`).join('') || `<tr><td colspan="6">No pulse entries found.</td></tr>`;
     if (!form.dataset.bound) {
       form.dataset.bound = '1';
       form.addEventListener('submit', async (e) => {
