@@ -35,63 +35,79 @@
         </nav>
             </aside>
             <main class="main">
-                <header class="header">
-                    <div>
-                        <h1>Patron Pulse</h1>
-                        <p>Log live crowd response and room energy.</p>
-                    </div>
-                    <div class="header-right">
-                        <div id="current-user"></div>
-                        <div id="connection-state" class="connection offline"></div>
-                        <button id="logout-button" class="secondary">Logout</button>
-                    </div>
-                </header>
-                <div id="flash-host"></div>
-                <section class="grid cols-2">
-                    <article class="card">
-                        <h3>New Pulse Entry</h3>
-                        <form id="pulse-form" class="stack">
-                            <label>Room
-                                <select name="room_id"></select>
-                            </label >
-                            "<label>Pulse Score
-                                "<input type = "number" name = "pulse_score" min = "0" max = "100" value = "0" />
-                            </label >
-                            "<label>Crowd Count
-                                "<input type = "number" name = "crowd_count" min = "0" value = "0" />
-                            </label >
-                            "<label>Energy Level
-                                "<input type = "number" name = "energy_level" min = "1" max = "10" value = "1" />
-                            </label >
-                            "<label>Source
-                                "<input name = "source" value = "moderator" />
-                            </label >
-                            "<label>Notes
-                                "<textarea name = "notes" rows = "5" ></textarea >
-                            </label >
-                            "<div class = "button-row" >
-                                "<button type = "submit" >Save Pulse< /button >
-                            </div >
-                        </form >
-                    </article >
-                    "<article class = "card" >
-                        "<h3>Recent Pulse< /h3 >
-                        "<table >
-                            "<thead >
-                                "<tr >
-                                    "<th >Room< /th >
-                                    "<th >Pulse< /th >
-                                    "<th >Crowd< /th >
-                                    "<th >Energy< /th >
-                                    "<th >Source< /th >
-                                    "<th >Created< /th >
-                                </tr >
-                            "</thead >
-                            "</tbody >
-                        "</table >
-                    "</article >
-                "</section >
-            "</main >
-        "</div >
-    "</body >
-"</html >
+  <header class="header">
+    <div>
+      <h1>Patron Pulse</h1>
+      <p>Log live crowd response and room energy.</p>
+    </div>
+    <div class="header-right">
+      <div id="current-user"></div>
+      <div id="connection-state" class="connection offline"></div>
+      <button id="logout-button" class="secondary">Logout</button>
+    </div>
+  </header>
+
+  <div id="flash-host"></div>
+
+  <section class="grid cols-2">
+    <article class="card">
+      <h3>New Pulse Entry</h3>
+      <form id="pulse-form" class="stack">
+        <label>
+          Room
+          <select name="room_id"></select>
+        </label>
+
+        <label>
+          Pulse Score
+          <input type="number" name="pulse_score" min="0" max="100" value="0" />
+        </label>
+
+        <label>
+          Crowd Count
+          <input type="number" name="crowd_count" min="0" value="0" />
+        </label>
+
+        <label>
+          Energy Level
+          <input type="number" name="energy_level" min="1" max="10" value="1" />
+        </label>
+
+        <label>
+          Source
+          <input name="source" value="moderator" />
+        </label>
+
+        <label>
+          Notes
+          <textarea name="notes" rows="5"></textarea>
+        </label>
+
+        <div class="button-row">
+          <button type="submit">Save Pulse</button>
+        </div>
+      </form>
+    </article>
+
+    <article class="card">
+      <h3>Recent Pulse</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Room</th>
+            <th>Pulse</th>
+            <th>Crowd</th>
+            <th>Energy</th>
+            <th>Source</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody id="pulse-table-body">
+        </tbody>
+      </table>
+    </article>
+  </section>
+</main>
+        </div >
+    </body >
+</html >
