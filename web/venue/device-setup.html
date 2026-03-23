@@ -301,7 +301,7 @@
           .from('devices')
           .select('*')
           .eq('venue_id', venueId)
-          .order('updated_at', { ascending: false });
+          .order('created_at', { ascending: false });
 
         if (error) throw error;
         currentDevices = data || [];
