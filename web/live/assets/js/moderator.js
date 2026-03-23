@@ -1,5 +1,5 @@
 (function () {
-  const db = window.LiveDB;
+    const db = window.LiveDB;
   const ui = window.LiveUI;
   const auth = window.LiveAuth;
 
