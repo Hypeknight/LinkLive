@@ -1,7 +1,7 @@
 (function () {
   const db = window.LiveDB;
-  const ui = window.LinkdNUI;
-  const auth = window.LinkdNV2Auth;
+  const ui = window.LiveUI;
+  const auth = window.LiveDB;
   let cached = { rooms: [], devices: [], schedules: [], notes: [], pulse: [] };
 
   async function refresh() {
