@@ -37,7 +37,7 @@
       if (error) throw error;
     },
 
-    async update(table, payload, match) {
+    async update(table, id, payload) {
       const { error } = await client.from(table).update(payload).match(match);
       if (error) throw error;
     },

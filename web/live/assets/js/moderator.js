@@ -371,69 +371,109 @@
   }
 
   async function bootLocalControls() {
-    const camSel = document.getElementById('local-camera-device');
-    const micSel = document.getElementById('local-mic-device');
-    const roomSel = document.getElementById('local-room-id');
-    const video = document.getElementById('local-video');
-    const info = document.getElementById('stream-info');
-    setOptions(roomSel, cached.rooms, 'Select room');
-    document.getElementById('local-map-table').innerHTML = cached.rooms.map(r => `<tr><td>${ui.esc(r.name)}</td><td>${ui.esc(cached.devices.find(d => d.id === r.assigned_camera_id)?.label || '—')}</td><td>${ui.esc(cached.devices.find(d => d.id === r.assigned_mic_id)?.label || '—')}</td><td>${ui.esc(r.status)}</td></tr>`).join('') || `<tr><td colspan="4">No rooms found.</td></tr>`;
+  const camSel = document.getElementById('local-camera-device');
+  const micSel = document.getElementById('local-mic-device');
+  const roomSel = document.getElementById('local-room-id');
+  const video = document.getElementById('local-video');
+  const info = document.getElementById('stream-info');
+  const mapBody = document.getElementById('local-map-table');
 
-    async function loadBrowserDevices() {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cams = devices.filter(d => d.kind === 'videoinput');
-      const mics = devices.filter(d => d.kind === 'audioinput');
-      camSel.innerHTML = cams.map(d => ui.option(d.deviceId, d.label || 'Camera')).join('');
-      micSel.innerHTML = mics.map(d => ui.option(d.deviceId, d.label || 'Microphone')).join('');
-      return { cams, mics };
-    }
-
-    document.getElementById('request-media').onclick = async () => {
-      try {
-        const req = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        req.getTracks().forEach(t => t.stop());
-        await loadBrowserDevices();
-        ui.flash('Camera and microphone access granted');
-      } catch (err) {
-        ui.flash(err.message || 'Media permission denied', 'error');
-      }
-    };
-    document.getElementById('start-preview').onclick = async () => {
-      try {
-        if (stream) stream.getTracks().forEach(t => t.stop());
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: camSel.value ? { deviceId: { exact: camSel.value } } : true,
-          audio: micSel.value ? { deviceId: { exact: micSel.value } } : true
-        });
-        video.srcObject = stream;
-        info.textContent = 'Preview active.';
-      } catch (err) {
-        ui.flash(err.message || 'Preview failed', 'error');
-      }
-    };
-    document.getElementById('stop-preview').onclick = () => {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      video.srcObject = null;
-      info.textContent = 'Preview stopped.';
-    };
-    document.getElementById('map-devices').onclick = async () => {
-      try {
-        const browserDevices = await navigator.mediaDevices.enumerateDevices();
-        const cam = browserDevices.find(d => d.deviceId === camSel.value);
-        const mic = browserDevices.find(d => d.deviceId === micSel.value);
-        const [savedCam] = await db.upsertDevices([{ label: cam?.label || 'Camera', device_kind: 'camera', browser_device_id: camSel.value, status: 'active' }]);
-        const [savedMic] = await db.upsertDevices([{ label: mic?.label || 'Microphone', device_kind: 'microphone', browser_device_id: micSel.value, status: 'active' }]);
-        await db.update('rooms', roomSel.value, { assigned_camera_id: savedCam?.id || null, assigned_mic_id: savedMic?.id || null, status: 'live' });
-        ui.flash('Devices mapped to room and room set live');
-      } catch (err) {
-        ui.flash(err.message || 'Failed to map devices', 'error');
-      }
-    };
-
-    if (navigator.mediaDevices?.enumerateDevices) {
-      try { await loadBrowserDevices(); } catch (_) {}
-    }
+  if (!camSel || !micSel || !roomSel || !video || !info || !mapBody) {
+    console.error('Local controls page is missing one or more required elements.');
+    return;
   }
+
+  setOptions(roomSel, cached.rooms, 'Select room');
+
+  mapBody.innerHTML = cached.rooms.map(r => `<tr>
+    <td>${ui.esc(r.name)}</td>
+    <td>${ui.esc(cached.devices.find(d => d.id === r.assigned_camera_id)?.label || '—')}</td>
+    <td>${ui.esc(cached.devices.find(d => d.id === r.assigned_mic_id)?.label || '—')}</td>
+    <td>${ui.esc(r.status)}</td>
+  </tr>`).join('') || `<tr><td colspan="4">No rooms found.</td></tr>`;
+
+  async function loadBrowserDevices() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind === 'videoinput');
+    const mics = devices.filter(d => d.kind === 'audioinput');
+    camSel.innerHTML = cams.map(d => ui.option(d.deviceId, d.label || 'Camera')).join('');
+    micSel.innerHTML = mics.map(d => ui.option(d.deviceId, d.label || 'Microphone')).join('');
+    return { cams, mics };
+  }
+
+  document.getElementById('request-media').onclick = async () => {
+    try {
+      const req = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      req.getTracks().forEach(t => t.stop());
+      await loadBrowserDevices();
+      ui.flash('Camera and microphone access granted');
+    } catch (err) {
+      ui.flash(err.message || 'Media permission denied', 'error');
+    }
+  };
+
+  document.getElementById('start-preview').onclick = async () => {
+    try {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: camSel.value ? { deviceId: { exact: camSel.value } } : true,
+        audio: micSel.value ? { deviceId: { exact: micSel.value } } : true
+      });
+      video.srcObject = stream;
+      info.textContent = 'Preview active.';
+    } catch (err) {
+      ui.flash(err.message || 'Preview failed', 'error');
+    }
+  };
+
+  document.getElementById('stop-preview').onclick = () => {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+    info.textContent = 'Preview stopped.';
+  };
+
+  document.getElementById('map-devices').onclick = async () => {
+    try {
+      const browserDevices = await navigator.mediaDevices.enumerateDevices();
+      const cam = browserDevices.find(d => d.deviceId === camSel.value);
+      const mic = browserDevices.find(d => d.deviceId === micSel.value);
+
+      const [savedCam] = await db.upsertDevices([
+        {
+          label: cam?.label || 'Camera',
+          device_kind: 'camera',
+          browser_device_id: camSel.value,
+          status: 'active'
+        }
+      ]);
+
+      const [savedMic] = await db.upsertDevices([
+        {
+          label: mic?.label || 'Microphone',
+          device_kind: 'microphone',
+          browser_device_id: micSel.value,
+          status: 'active'
+        }
+      ]);
+
+      await db.update('rooms', roomSel.value, {
+        assigned_camera_id: savedCam?.id || null,
+        assigned_mic_id: savedMic?.id || null,
+        status: 'live'
+      });
+
+      ui.flash('Devices mapped to room and room set live');
+    } catch (err) {
+      ui.flash(err.message || 'Failed to map devices', 'error');
+    }
+  };
+
+  if (navigator.mediaDevices?.enumerateDevices) {
+    try {
+      await loadBrowserDevices();
+    } catch (_) {}
+  }
+}
 
   document.addEventListener('DOMContentLoaded', () => {
     boot().catch(err => {
