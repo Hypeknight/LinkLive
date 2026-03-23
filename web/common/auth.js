@@ -58,19 +58,28 @@ window.LinkdNV2Auth = (() => {
   }
 
   async function requireRole(allowedRoles = []) {
-    await requireAuth();
+  await requireAuth();
+  const profile = await getProfile();
 
-    const profile = await getProfile();
-    if (!profile) {
-      throw new Error('Profile not found for this user.');
-    }
+  console.log('Allowed roles:', allowedRoles);
+  console.log('Profile role:', profile?.role);
 
-    if (!allowedRoles.includes(profile.role)) {
-      throw new Error(`Access denied for role: ${profile.role}`);
-    }
-
-    return profile;
+  if (!profile) {
+    throw new Error('Profile not found.');
   }
+
+  const normalizedAllowed = allowedRoles.map(r => String(r).trim().toLowerCase());
+  const normalizedRole = String(profile.role || '').trim().toLowerCase();
+
+  console.log('Normalized allowed:', normalizedAllowed);
+  console.log('Normalized role:', normalizedRole);
+
+  if (!normalizedAllowed.includes(normalizedRole)) {
+    throw new Error(`Access denied for role: ${profile.role}`);
+  }
+
+  return profile;
+}
 
   async function bootProtectedShell() {
     const profile = await getProfile();
