@@ -35,73 +35,89 @@
         </nav>
             </aside>
             <main class="main">
-                <header class="header">
-                    <div>
-                        <h1>Ops Notes</h1>
-                        <p>Track incidents, assignments, and follow-through.</p>
-                    </div>
-                    <div class="header-right">
-                        <div id="current-user"></div>
-                        <div id="connection-state" class="connection offline"></div>
-                        <button id="logout-button" class="secondary">Logout</button>
-                    </div>
-                </header>
-                <div id="flash-host"></div>
-                <section class="grid cols-2">
-                    <article class="card">
-                        <h3>Add / Edit Ops Note</h3>
-                        <form id="ops-form" class="stack">
-                            <label>Room
-                                <select name="room_id"></select>
-                            </label>
-                            <label>Title
-                                <input name="title" required />
-                            </label>
-                            <label>Priority
-                                <select name="priority">
-                                    <option value("low")>low</option)
-                                    <option value("medium")>medium</option)
-                                    <option value("high")>high</option)
-                                </select >
-                            </label >
-                            <label>Status
-                                <select name = "status" >
-                                    "<option value = "open" >open< /option >
-                                    "<option value = "in_progress" >in_progress< /option >
-                                    "<option value = "closed" >closed< /option >
-                                </select >
-                            </label >
-                            "<label>Assigned To
-                                "<input name = "assigned_to" />
-                            </label >
-                            "<label>Note
-                                "<textarea name = "note" rows = "5" >< /textarea >
-                            </label >
-                            "<div class = "button-row" >
-                                "<button type = "submit" >Save Note< /button >
-                                "<button type = "button" class = "secondary" id = "ops-form-reset" >Reset< /button >
-                            </div >
-                        </form >
-                    </article >
-                    "<article class = "card" >
-                        "<h3>Ops Notes< /h3 >
-                        "<table >
-                            "<thead >
-                                "<tr >
-                                    "<th >Title< /th >
-                                    "<th >Room< /th >
-                                    "<th >Priority< /th >
-                                    "<th >Status< /th >
-                                    "<th >Assigned< /th >
-                                    "<th >Created< /th >
-                                    "<th >Actions< /th >
-                                </tr >
-                            "</thead >
-                            "</tbody >
-                        "</table >
-                    "</article >
-                "</section >
-            "</main >
-        "</div >
-    "</body >
-"</html >
+  <header class="header">
+    <div>
+      <h1>Ops Notes</h1>
+      <p>Track incidents, assignments, and follow-through.</p>
+    </div>
+    <div class="header-right">
+      <div id="current-user"></div>
+      <div id="connection-state" class="connection offline"></div>
+      <button id="logout-button" class="secondary">Logout</button>
+    </div>
+  </header>
+
+  <div id="flash-host"></div>
+
+  <section class="grid cols-2">
+    <article class="card">
+      <h3>Add / Edit Ops Note</h3>
+      <form id="ops-form" class="stack">
+        <label>
+          Room
+          <select name="room_id"></select>
+        </label>
+
+        <label>
+          Title
+          <input name="title" required />
+        </label>
+
+        <label>
+          Priority
+          <select name="priority">
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </label>
+
+        <label>
+          Status
+          <select name="status">
+            <option value="open">open</option>
+            <option value="in_progress">in_progress</option>
+            <option value="closed">closed</option>
+          </select>
+        </label>
+
+        <label>
+          Assigned To
+          <input name="assigned_to" />
+        </label>
+
+        <label>
+          Note
+          <textarea name="note" rows="5"></textarea>
+        </label>
+
+        <div class="button-row">
+          <button type="submit">Save Note</button>
+          <button type="button" class="secondary" id="ops-form-reset">Reset</button>
+        </div>
+      </form>
+    </article>
+
+    <article class="card">
+      <h3>Ops Notes</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Room</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Assigned</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ops-table-body">
+        </tbody>
+      </table>
+    </article>
+  </section>
+</main>
+        </div >
+    </body >
+</html >
