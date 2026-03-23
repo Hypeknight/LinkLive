@@ -27,16 +27,59 @@
   }
 
   function renderDashboard() {
-    const now = Date.now();
-    document.querySelector('[data-stat="rooms"]').textContent = cached.rooms.length;
-    document.querySelector('[data-stat="live"]').textContent = cached.rooms.filter(r => r.status === 'live').length;
-    document.querySelector('[data-stat="upcoming"]').textContent = cached.schedules.filter(s => new Date(s.start_at || 0).getTime() >= now).length;
-    document.querySelector('[data-stat="avgPulse"]').textContent = `${cached.pulse.length ? Math.round(cached.pulse.reduce((a,b)=>a+Number(b.pulse_score||0),0)/cached.pulse.length) : 0}%`;
+  const now = Date.now();
 
-    document.getElementById('venue-room-grid').innerHTML = cached.rooms.map(r => `<article class="mini-card"><h3>${ui.esc(r.name)}</h3><div class="helper">Zone ${ui.esc(r.zone || '—')}</div><div class="pill ${ui.esc(r.status)}">${ui.esc(r.status)}</div><div class="helper">Capacity ${ui.esc(r.capacity)}</div></article>`).join('') || `<p>No rooms found.</p>`;
-    document.getElementById('venue-schedule-list').innerHTML = cached.schedules.slice(0, 8).map(s => `<tr><td>${ui.esc(s.title)}</td><td>${ui.esc(ui.roomName(cached.rooms, s.room_id))}</td><td>${ui.fmtDate(s.start_at)}</td><td>${ui.fmtDate(s.end_at)}</td></tr>`).join('') || `<tr><td colspan="4">No schedule blocks found.</td></tr>`;
-    document.getElementById('venue-note-list').innerHTML = cached.notes.filter(n => n.status !== 'closed').slice(0,6).map(n => `<tr><td>${ui.esc(n.title)}</td><td>${ui.esc(n.priority)}</td><td>${ui.esc(n.status)}</td></tr>`).join('') || `<tr><td colspan="3">No open ops notes.</td></tr>`;
+  const roomsStat = document.querySelector('[data-stat="rooms"]');
+  const liveStat = document.querySelector('[data-stat="live"]');
+  const upcomingStat = document.querySelector('[data-stat="upcoming"]');
+  const avgPulseStat = document.querySelector('[data-stat="avgPulse"]');
+  const roomGrid = document.getElementById('venue-room-grid');
+  const scheduleList = document.getElementById('venue-schedule-list');
+  const noteList = document.getElementById('venue-note-list');
+
+  if (!roomsStat || !liveStat || !upcomingStat || !avgPulseStat || !roomGrid || !scheduleList || !noteList) {
+    console.error('Venue dashboard is missing required elements.');
+    return;
   }
+
+  roomsStat.textContent = cached.rooms.length;
+  liveStat.textContent = cached.rooms.filter(r => r.status === 'live').length;
+  upcomingStat.textContent = cached.schedules.filter(
+    s => new Date(s.start_at || 0).getTime() >= now
+  ).length;
+  avgPulseStat.textContent = `${cached.pulse.length
+    ? Math.round(cached.pulse.reduce((a, b) => a + Number(b.pulse_score || 0), 0) / cached.pulse.length)
+    : 0}%`;
+
+  roomGrid.innerHTML =
+    cached.rooms.map(r => `
+      <article class="mini-card">
+        <h3>${ui.esc(r.name)}</h3>
+        <div class="helper">Zone ${ui.esc(r.zone || '—')}</div>
+        <div class="pill ${ui.esc(r.status)}">${ui.esc(r.status)}</div>
+        <div class="helper">Capacity ${ui.esc(r.capacity)}</div>
+      </article>
+    `).join('') || `<p>No rooms found.</p>`;
+
+  scheduleList.innerHTML =
+    cached.schedules.slice(0, 8).map(s => `
+      <tr>
+        <td>${ui.esc(s.title)}</td>
+        <td>${ui.esc(ui.roomName(cached.rooms, s.room_id))}</td>
+        <td>${ui.fmtDate(s.start_at)}</td>
+        <td>${ui.fmtDate(s.end_at)}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="4">No schedule blocks found.</td></tr>`;
+
+  noteList.innerHTML =
+    cached.notes.filter(n => n.status !== 'closed').slice(0, 6).map(n => `
+      <tr>
+        <td>${ui.esc(n.title)}</td>
+        <td>${ui.esc(n.priority)}</td>
+        <td>${ui.esc(n.status)}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="3">No open ops notes.</td></tr>`;
+}
 
   function renderRooms() {
     document.getElementById('venue-rooms-table').innerHTML = cached.rooms.map(r => `<tr><td>${ui.esc(r.name)}</td><td>${ui.esc(r.zone || '—')}</td><td>${ui.esc(r.capacity)}</td><td>${ui.esc(r.status)}</td><td>${ui.esc(cached.devices.find(d => d.id === r.assigned_camera_id)?.label || '—')}</td><td>${ui.esc(cached.devices.find(d => d.id === r.assigned_mic_id)?.label || '—')}</td></tr>`).join('') || `<tr><td colspan="6">No rooms found.</td></tr>`;

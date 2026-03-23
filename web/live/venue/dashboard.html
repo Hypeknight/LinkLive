@@ -1,62 +1,119 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Venue Dashboard</title>
-        <script src="/common/config.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-        <script src="/common/supabase.js"></script>
-        <script src="/common/db.js"></script>
-        <script src="/common/ui.js"></script>
-        <script src="/common/auth.js"></script>
-        <script src="/live/assets/js/venue.js"></script>
-    </head>
-    <body data-page="venue-dashboard">
-        <div class="shell venue-shell">
-            <aside class="sidebar">
-                <div class="brand-row">
-                    <span class="brand-mark"></span>
-                    <div>
-                        <div class="brand" data-app-name></div>
-                        <div class="sub">Venue side</div>
-                    </div>
-                </div>
-                <div class="badge-row">
-                    <strong data-venue-name></strong>
-                </div>
-                <nav class="nav">
-                    <a href="/venue/dashboard.html">Owner Dashboard</a>
-                    <a class="active" href="/owner/dashboard.html">Dashboard</a>
-                    <a href="/live/venue/rooms.html">Rooms</a>
-                    <a href="/live/venue/schedule.html">Schedule</a>
-                    <a href="/live/venue/pulse.html">Pulse</a>
-                    <a href="/live/venue/wallboard.html">Wallboard</a>
-                    <!-- <a href="/moderator/dashboard.html">Moderator</a> -->
-                </nav>
-            </aside>
-            <main class="main">
-                <header class="header">
-                    <div>
-                        <h1>Venue Dashboard</h1>
-                        <p>Read-only live venue overview.</p>
-                    </div>
-                    <div class="header-right">
-                        <div id="current-user"></div>
-                        <div id="connection-state" class="connection offline"></div>
-                        <button id="logout-button" class="secondary">Logout</button>
-                    </div>
-                </header>
-                <div id="flash-host"></div>
-                <section class="stats-grid">
-                    <article class="card stat-card">
-                        <div class="muted">Rooms</div>
-                        <div class="stat" data-stat="rooms">0</div>
-                    </article>
-                    <article class="card stat-card">
-                        <div class="muted">Live Rooms</div>
-                        <div class="stat" data-stat="live">0</div>
-                    </article>
-                    <article class="card stat-card">
-                        <div class="muted">Upcoming</div>
-                        <div class="stat" data-stat="upcoming">0</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Venue Dashboard</title>
+    <link rel="stylesheet" href="/common/app.css" />
+
+    <script src="/common/config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/common/supabase.js"></script>
+    <script src="/common/db.js"></script>
+    <script src="/common/ui.js"></script>
+    <script src="/common/auth.js"></script>
+    <script src="/live/assets/js/venue.js"></script>
+  </head>
+  <body data-page="venue-dashboard">
+    <div class="shell venue-shell">
+      <aside class="sidebar">
+        <div class="brand-row">
+          <span class="brand-mark"></span>
+          <div>
+            <div class="brand" data-app-name></div>
+            <div class="sub">Venue side</div>
+          </div>
+        </div>
+
+        <div class="badge-row">
+          <strong data-venue-name></strong>
+        </div>
+
+        <nav class="nav">
+          <a class="active" href="/live/venue/dashboard.html">Dashboard</a>
+          <a href="/live/venue/rooms.html">Rooms</a>
+          <a href="/live/venue/schedule.html">Schedule</a>
+          <a href="/live/venue/pulse.html">Pulse</a>
+          <a href="/live/venue/wallboard.html">Wallboard</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="header">
+          <div>
+            <h1>Venue Dashboard</h1>
+            <p>Read-only live venue overview.</p>
+          </div>
+
+          <div class="header-right">
+            <div id="current-user"></div>
+            <div id="connection-state" class="connection offline" data-connection-status>
+              Offline
+            </div>
+            <button id="logout-button" class="secondary" type="button">Logout</button>
+          </div>
+        </header>
+
+        <div id="flash-host"></div>
+
+        <section class="stats-grid">
+          <article class="card stat-card">
+            <div class="muted">Rooms</div>
+            <div class="stat" data-stat="rooms">0</div>
+          </article>
+
+          <article class="card stat-card">
+            <div class="muted">Live Rooms</div>
+            <div class="stat" data-stat="live">0</div>
+          </article>
+
+          <article class="card stat-card">
+            <div class="muted">Upcoming</div>
+            <div class="stat" data-stat="upcoming">0</div>
+          </article>
+
+          <article class="card stat-card">
+            <div class="muted">Average Pulse</div>
+            <div class="stat" data-stat="avgPulse">0%</div>
+          </article>
+        </section>
+
+        <section class="grid cols-3">
+          <article class="card">
+            <h3>Rooms</h3>
+            <div id="venue-room-grid" class="stack"></div>
+          </article>
+
+          <article class="card">
+            <h3>Schedule</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Room</th>
+                  <th>Start</th>
+                  <th>End</th>
+                </tr>
+              </thead>
+              <tbody id="venue-schedule-list"></tbody>
+            </table>
+          </article>
+
+          <article class="card">
+            <h3>Open Ops Notes</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="venue-note-list"></tbody>
+            </table>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
