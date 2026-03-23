@@ -35,70 +35,86 @@
         </nav>
             </aside>
             <main class="main">
-                <header class="header">
-                    <div>
-                        <h1>Scheduling</h1>
-                        <p>Create and control room schedule blocks.</p>
-                    </div>
-                    <div class="header-right">
-                        <div id="current-user"></div>
-                        <div id="connection-state" class="connection offline"></div>
-                        <button id="logout-button" class="secondary">Logout</button>
-                    </div>
-                </header>
-                <div id="flash-host"></div>
-                <section class="grid cols-2">
-                    <article class="card">
-                        <h3 id="schedule-form-title">Add Schedule Block</h3>
-                        <form id="schedule-form" class="stack">
-                            <label>Title
-                                <input name="title" required />
-                            </label >
-                            "<label>Room
-                                "<select name = "room_id" ></select >
-                            </label >
-                            "<label>Start
-                                "<input type = "datetime-local" name = "start_at" required />
-                            </label >
-                            "<label>End
-                                "<input type = "datetime-local" name = "end_at" />
-                            </label >
-                            "<label>Lead Name
-                                "<input name = "lead_name" />
-                            </label >
-                            "<label>Status
-                                "<select name = "status" >
-                                    "<option value = "scheduled" >scheduled</option >
-                                    "<option value = "live" >live</option >
-                                    "<option value = "completed" >completed</option >
-                                    "<option value = "cancelled" >cancelled</option >
-                                </select >
-                            </label >
-                            "<div class = "button-row" >
-                                "<button type = "submit" >Save Schedule< /button >
-                                "<button type = "button" class = "secondary" id = "schedule-form-reset" >Reset< /button >
-                            </div >
-                        </form >
-                    </article >
-                    "<article class = "card" >
-                        "<h3>Schedule< /h3 >
-                        "<table >
-                            "<thead >
-                                "<tr >
-                                    "<th >Title< /th >
-                                    "<th >Room< /th >
-                                    "<th >Start< /th >
-                                    "<th >End< /th >
-                                    "<th >Lead< /th >
-                                    "<th >Status< /th >
-                                    "<th >Actions< /th >
-                                </tr >
-                            "</thead >
-                            "</tbody >
-                        "</table >
-                    "</article >
-                "</section >
-            "</main >
-        "</div >
-    "</body >
-"</html >
+  <header class="header">
+    <div>
+      <h1>Scheduling</h1>
+      <p>Create and control room schedule blocks.</p>
+    </div>
+    <div class="header-right">
+      <div id="current-user"></div>
+      <div id="connection-state" class="connection offline"></div>
+      <button id="logout-button" class="secondary">Logout</button>
+    </div>
+  </header>
+
+  <div id="flash-host"></div>
+
+  <section class="grid cols-2">
+    <article class="card">
+      <h3 id="schedule-form-title">Add Schedule Block</h3>
+      <form id="schedule-form" class="stack">
+        <label>
+          Title
+          <input name="title" required />
+        </label>
+
+        <label>
+          Room
+          <select name="room_id"></select>
+        </label>
+
+        <label>
+          Start
+          <input type="datetime-local" name="start_at" required />
+        </label>
+
+        <label>
+          End
+          <input type="datetime-local" name="end_at" />
+        </label>
+
+        <label>
+          Lead Name
+          <input name="lead_name" />
+        </label>
+
+        <label>
+          Status
+          <select name="status">
+            <option value="scheduled">scheduled</option>
+            <option value="live">live</option>
+            <option value="completed">completed</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+        </label>
+
+        <div class="button-row">
+          <button type="submit">Save Schedule</button>
+          <button type="button" class="secondary" id="schedule-form-reset">Reset</button>
+        </div>
+      </form>
+    </article>
+
+    <article class="card">
+      <h3>Schedule</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Room</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Lead</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="schedule-table-body">
+        </tbody>
+      </table>
+    </article>
+  </section>
+</main>
+        </div >
+    </body >
+</html >
