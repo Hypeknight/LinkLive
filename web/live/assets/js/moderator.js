@@ -62,20 +62,35 @@
   }
 
   async function bootRooms() {
-    const form = document.getElementById('room-form');
-    if (!form) return;
-    setOptions(form.assigned_camera_id, cached.devices.filter(d => d.device_kind === 'camera'), 'Unassigned camera', 'id', 'label');
-    setOptions(form.assigned_mic_id, cached.devices.filter(d => d.device_kind === 'microphone'), 'Unassigned mic', 'id', 'label');
-    //let editingId = form.dataset.editingId || '';
-    const tbody = document.getElementById('rooms-table-body');
-    if (!tbody) {
+  const form = document.getElementById('room-form');
+  if (!form) return;
+
+  setOptions(
+    form.assigned_camera_id,
+    cached.devices.filter(d => d.device_kind === 'camera'),
+    'Unassigned camera',
+    'id',
+    'label'
+  );
+
+  setOptions(
+    form.assigned_mic_id,
+    cached.devices.filter(d => d.device_kind === 'microphone'),
+    'Unassigned mic',
+    'id',
+    'label'
+  );
+
+  const tbody = document.getElementById('rooms-table-body');
+  if (!tbody) {
     console.error('rooms-table-body not found');
     return;
-}
-    let editingId = form.dataset.editingId || '';
+  }
+
+  let editingId = form.dataset.editingId || '';
 
   tbody.innerHTML = cached.rooms.map(r => `<tr>
-    <td>${ui.esc(r.name)}</td>
+    <td>${ui.esc(r.title)}</td>
     <td>${ui.esc(r.zone || '—')}</td>
     <td>${ui.esc(r.capacity)}</td>
     <td>${ui.esc(r.status)}</td>
@@ -89,68 +104,76 @@
     </td>
   </tr>`).join('') || `<tr><td colspan="7">No rooms found.</td></tr>`;
 
+  tbody.querySelectorAll('[data-edit]').forEach(btn => btn.onclick = () => {
+    const r = cached.rooms.find(x => x.id === btn.dataset.edit);
+    if (!r) return;
 
-    tbody.querySelectorAll('[data-edit]').forEach(btn => btn.onclick = () => {
-      const r = cached.rooms.find(x => x.id === btn.dataset.edit);
-      if (!r) return;
-      editingId = r.id;
-      form.dataset.editingId = r.id;
-      form.name.value = r.name || '';
-      form.zone.value = r.zone || '';
-      form.capacity.value = r.capacity || 0;
-      form.status.value = r.status || 'scheduled';
-      form.assigned_camera_id.value = r.assigned_camera_id || '';
-      form.assigned_mic_id.value = r.assigned_mic_id || '';
-      document.getElementById('room-form-title').textContent = 'Edit Room';
-    });
-    tbody.querySelectorAll('[data-live]').forEach(btn => btn.onclick = async () => {
-      await db.update('rooms', btn.dataset.live, { status: 'live' });
-      ui.flash('Room is live');
-    });
-    tbody.querySelectorAll('[data-complete]').forEach(btn => btn.onclick = async () => {
-      await db.update('rooms', btn.dataset.complete, { status: 'completed' });
-      ui.flash('Room marked complete');
-    });
-    tbody.querySelectorAll('[data-delete]').forEach(btn => btn.onclick = async () => {
-      if (!confirm('Delete this room?')) return;
-      await db.remove('rooms', btn.dataset.delete);
-      ui.flash('Room deleted');
-    });
+    editingId = r.id;
+    form.dataset.editingId = r.id;
+    form.title.value = r.title || '';
+    form.zone.value = r.zone || '';
+    form.capacity.value = r.capacity || 0;
+    form.status.value = r.status || 'scheduled';
+    form.assigned_camera_id.value = r.assigned_camera_id || '';
+    form.assigned_mic_id.value = r.assigned_mic_id || '';
+    document.getElementById('room-form-title').textContent = 'Edit Room';
+  });
 
-    if (!form.dataset.bound) {
-      form.dataset.bound = '1';
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const payload = {
-          name: form.name.value.trim(),
-          zone: form.zone.value.trim() || null,
-          capacity: Number(form.capacity.value || 0),
-          status: form.status.value,
-          assigned_camera_id: form.assigned_camera_id.value || null,
-          assigned_mic_id: form.assigned_mic_id.value || null
-        };
-        try {
-          if (form.dataset.editingId) {
-            await db.update('rooms', form.dataset.editingId, payload);
-            ui.flash('Room updated');
-          } else {
-            await db.insert('rooms', payload);
-            ui.flash('Room created');
-          }
-          form.reset();
-          form.dataset.editingId = '';
-          document.getElementById('room-form-title').textContent = 'Add Room';
-        } catch (err) {
-          ui.flash(err.message, 'error');
+  tbody.querySelectorAll('[data-live]').forEach(btn => btn.onclick = async () => {
+    await db.update('rooms', btn.dataset.live, { status: 'live' });
+    ui.flash('Room is live');
+  });
+
+  tbody.querySelectorAll('[data-complete]').forEach(btn => btn.onclick = async () => {
+    await db.update('rooms', btn.dataset.complete, { status: 'completed' });
+    ui.flash('Room marked complete');
+  });
+
+  tbody.querySelectorAll('[data-delete]').forEach(btn => btn.onclick = async () => {
+    if (!confirm('Delete this room?')) return;
+    await db.remove('rooms', btn.dataset.delete);
+    ui.flash('Room deleted');
+  });
+
+  if (!form.dataset.bound) {
+    form.dataset.bound = '1';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        title: form.title.value.trim(),
+        zone: form.zone.value.trim() || null,
+        capacity: Number(form.capacity.value || 0),
+        status: form.status.value,
+        assigned_camera_id: form.assigned_camera_id.value || null,
+        assigned_mic_id: form.assigned_mic_id.value || null
+      };
+
+      try {
+        if (form.dataset.editingId) {
+          await db.update('rooms', form.dataset.editingId, payload);
+          ui.flash('Room updated');
+        } else {
+          await db.insert('rooms', payload);
+          ui.flash('Room created');
         }
-      });
-      document.getElementById('room-form-reset').addEventListener('click', () => {
+
         form.reset();
         form.dataset.editingId = '';
         document.getElementById('room-form-title').textContent = 'Add Room';
-      });
-    }
+      } catch (err) {
+        ui.flash(err.message, 'error');
+      }
+    });
+
+    document.getElementById('room-form-reset').addEventListener('click', () => {
+      form.reset();
+      form.dataset.editingId = '';
+      document.getElementById('room-form-title').textContent = 'Add Room';
+    });
   }
+}
 
   async function bootScheduling() {
     const form = document.getElementById('schedule-form');
