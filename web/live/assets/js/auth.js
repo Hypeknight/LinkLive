@@ -1,6 +1,6 @@
 (function () {
-  const db = window.LiveDB;
-  const ui = window.LiveUI;
+  const db = window.LiveDB1;
+  const ui = window.LiveUI1;
   const cfg = db.cfg;
 
   async function requireRole(allowedRoles) {

@@ -1,5 +1,5 @@
 (function () {
-  const cfg = (window.LiveDB && window.LiveDB.cfg) || window.APP_CONFIG || {};
+  const cfg = (window.LiveDB3 && window.LiveDB3.cfg) || window.APP_CONFIG || {};
 
   function qs(sel, root = document) { return root.querySelector(sel); }
   function qsa(sel, root = document) { return [...root.querySelectorAll(sel)]; }

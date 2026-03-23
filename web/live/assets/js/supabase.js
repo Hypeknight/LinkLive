@@ -15,7 +15,7 @@
     }
   });
 
-  window.LiveDB = {
+  window.LiveDB1 = {
     cfg,
     sb,
     venueId: cfg.venueId,
