@@ -1,7 +1,7 @@
 (function () {
   const db = window.LiveDB;
   const ui = window.LiveUI;
-  const auth = window.LiveDB;
+  const auth = window.LiveAuth;
   let cached = { rooms: [], devices: [], schedules: [], notes: [], pulse: [] };
 
   async function refresh() {
