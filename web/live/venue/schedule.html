@@ -4,7 +4,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Venue Schedule</title>
-        <link rel="stylesheet" href="/assets/css/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/assets/js/config.js"></script><script src="/assets/js/supabase.js"></script><script src="/assets/js/common.js"></script><script src="/assets/js/auth.js"></script><script src="/assets/js/venue.js"></script></head><body data-page="venue-schedule"><div class="shell venue-shell"><aside class="sidebar"><div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Venue side</div></div></div><nav class="nav"><a href="/venue/dashboard.html">Dashboard</a><a href="/venue/rooms.html">Rooms</a><a class="active" href="/venue/schedule.html">Schedule</a><a href="/venue/pulse.html">Pulse</a><a href="/venue/wallboard.html">Wallboard</a></nav></aside><main class="main"><header class="header"><div><h1>Venue Schedule</h1><p>Read-only schedule and lead assignments.</p></div><div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline"></div><button id="logout-button" class="secondary">Logout</button></div></header><div id="flash-host"></div><article class="card"><table><thead><tr><th>Title</th><th>Room</th><th>Start</th><th>End</th><th>Lead</th><th>Status</th></tr></thead><tbody id="venue-schedule-table"></tbody></table></article></main></div></body></html>
+        <link rel="stylesheet" href="/assets/css/app.css">
         <script src="/common/config.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
         <script src="/common/supabase.js"></script>
@@ -24,11 +24,11 @@
                     </div>
                 </div>
                 <nav class="nav">
-                    <a href="live/venue/dashboard.html">Dashboard</a>
-                    <a href="live/venue/rooms.html">Rooms</a>
-                    <a class="active" href="live/venue/schedule.html">Schedule</a>
-                    <a href="live/venue/pulse.html">Pulse</a>
-                    <a href="live/venue/wallboard.html">Wallboard</a>
+                    <a href="/live/venue/dashboard.html">Dashboard</a>
+                    <a href="/live/venue/rooms.html">Rooms</a>
+                    <a class="active" href="/live/venue/schedule.html">Schedule</a>
+                    <a href="/live/venue/pulse.html">Pulse</a>
+                    <a href="/live/venue/wallboard.html">Wallboard</a>
                 </nav>
             </aside>
             <main class="main">
