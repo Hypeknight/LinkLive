@@ -3,7 +3,7 @@
   const ui = window.LiveUI1;
   const cfg = db.cfg;
 
-  async function requireRole(allowedRoles) {
+  async function requireRole1(allowedRoles) {
     try {
       const session = await db.getSession();
       if (!session) {
