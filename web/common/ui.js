@@ -72,11 +72,13 @@ window.LiveUI = window.LiveUI || {};
   }
 
   function setConnection(isConnected, label) {
-    const el = document.querySelector('[data-connection-status]');
+    const el = document.querySelector('[data-connection-status], #connection-state');
     if (!el) return;
 
     el.textContent = label || (isConnected ? 'Connected' : 'Disconnected');
     el.dataset.state = isConnected ? 'connected' : 'disconnected';
+    el.classList.toggle('offline', !isConnected);
+    el.classList.toggle('online', !!isConnected);
   }
 
   function fillShell() {}
@@ -99,6 +101,12 @@ window.LiveUI = window.LiveUI || {};
 
   function roomName(rooms, id) {
     return rooms.find(r => r.id === id)?.name || '—';
+  }
+
+  function option(value, label, selected = false) {
+    const safeValue = esc(value ?? '');
+    const safeLabel = esc(label ?? '');
+    return `<option value="${safeValue}"${selected ? ' selected' : ''}>${safeLabel}</option>`;
   }
 
   async function loadReferenceData() {
@@ -126,13 +134,16 @@ window.LiveUI = window.LiveUI || {};
     };
   }
 
-  window.LiveUI = {
+  Object.assign(window.LiveUI, {
     flash,
     setConnection,
     fillShell,
     esc,
     fmtDate,
     roomName,
+    option,
     loadReferenceData
-  };
+  });
+
+  console.log('LiveUI initialized:', Object.keys(window.LiveUI));
 })();
