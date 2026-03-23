@@ -244,7 +244,7 @@
         const { data: venue, error: venueError } = await db.client
           .from('venues')
           .select('id')
-          .eq('owner_id', currentUser.id)
+          .eq('owner_profile_id', currentUser.id)
           .limit(1)
           .maybeSingle();
 
