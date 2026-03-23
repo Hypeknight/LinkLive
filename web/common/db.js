@@ -21,7 +21,9 @@
 
     cfg: {
       allowVenuePublicRead: false, // change to true if needed
-      venueRoles: ['admin','moderator','ops','venue']
+      venueRoles: ['admin','moderator','ops','venue'],
+      moderatorRoles: ['admin','moderator','ops']
+      
     },
 
     async get(table) {
