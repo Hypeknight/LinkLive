@@ -42,28 +42,97 @@ window.LinkdNUI = {
 };
 window.LiveUI = window.LiveUI || {};
 
-window.LiveUI.flash = function (message, type = 'info') {
-  let box = document.getElementById('live-flash');
+(function () {
+  function flash(message, type = 'info') {
+    let box = document.getElementById('live-flash');
 
-  if (!box) {
-    box = document.createElement('div');
-    box.id = 'live-flash';
-    box.style.position = 'fixed';
-    box.style.top = '20px';
-    box.style.right = '20px';
-    box.style.zIndex = '9999';
-    box.style.padding = '12px 16px';
-    box.style.borderRadius = '8px';
-    box.style.background = '#1f2937';
-    box.style.color = '#fff';
-    document.body.appendChild(box);
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'live-flash';
+      box.style.position = 'fixed';
+      box.style.top = '20px';
+      box.style.right = '20px';
+      box.style.zIndex = '9999';
+      box.style.padding = '12px 16px';
+      box.style.borderRadius = '8px';
+      box.style.background = '#1f2937';
+      box.style.color = '#fff';
+      box.style.boxShadow = '0 8px 24px rgba(0,0,0,.25)';
+      document.body.appendChild(box);
+    }
+
+    box.textContent = message;
+    box.style.display = 'block';
+    box.style.background = type === 'error' ? '#7f1d1d' : '#1f2937';
+
+    clearTimeout(box._timer);
+    box._timer = setTimeout(() => {
+      box.style.display = 'none';
+    }, 3000);
   }
 
-  box.textContent = message;
-  box.style.display = 'block';
-  box.style.background = type === 'error' ? '#7f1d1d' : '#1f2937';
+  function setConnection(isConnected, label) {
+    const el = document.querySelector('[data-connection-status]');
+    if (!el) return;
 
-  setTimeout(() => {
-    box.style.display = 'none';
-  }, 3000);
-};
+    el.textContent = label || (isConnected ? 'Connected' : 'Disconnected');
+    el.dataset.state = isConnected ? 'connected' : 'disconnected';
+  }
+
+  function fillShell() {}
+
+  function esc(v) {
+    return String(v ?? '').replace(/[&<>"']/g, s => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[s]));
+  }
+
+  function fmtDate(v) {
+    if (!v) return '—';
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
+  }
+
+  function roomName(rooms, id) {
+    return rooms.find(r => r.id === id)?.name || '—';
+  }
+
+  async function loadReferenceData() {
+    const db = window.LiveDB;
+    const venueId = db.cfg.venueId;
+
+    const [rooms, devices, schedules, notes, pulse] = await Promise.all([
+      db.client.from('rooms').select('*').eq('venue_id', venueId),
+      db.client.from('devices').select('*').eq('venue_id', venueId),
+      db.client.from('schedules').select('*').eq('venue_id', venueId),
+      db.client.from('ops_notes').select('*').eq('venue_id', venueId),
+      db.client.from('patron_pulse').select('*').eq('venue_id', venueId)
+    ]);
+
+    [rooms, devices, schedules, notes, pulse].forEach(r => {
+      if (r.error) throw r.error;
+    });
+
+    return {
+      rooms: rooms.data || [],
+      devices: devices.data || [],
+      schedules: schedules.data || [],
+      notes: notes.data || [],
+      pulse: pulse.data || []
+    };
+  }
+
+  window.LiveUI = {
+    flash,
+    setConnection,
+    fillShell,
+    esc,
+    fmtDate,
+    roomName,
+    loadReferenceData
+  };
+})();
