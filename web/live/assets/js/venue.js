@@ -492,8 +492,8 @@
     const camSel = document.getElementById('local-camera-device');
     const micSel = document.getElementById('local-mic-device');
     const rows = [];
-    if (camSel?.value) rows.push({ venue_id: state.venue.id, room_id: state.roomMembership?.room_id || null, name: camSel.options[camSel.selectedIndex]?.text || 'Camera', type: 'camera', input_id: camSel.value, status: 'active', is_default: false });
-    if (micSel?.value) rows.push({ venue_id: state.venue.id, room_id: state.roomMembership?.room_id || null, name: micSel.options[micSel.selectedIndex]?.text || 'Microphone', type: 'microphone', input_id: micSel.value, status: 'active', is_default: false });
+    if (camSel?.value) rows.push({ venue_id: state.venue.id, room_id: state.roomMembership?.room_id || null, name: camSel.options[camSel.selectedIndex]?.text || 'Camera', type: 'camera', input_id: camSel.value, status: 'online', is_default: false });
+    if (micSel?.value) rows.push({ venue_id: state.venue.id, room_id: state.roomMembership?.room_id || null, name: micSel.options[micSel.selectedIndex]?.text || 'Microphone', type: 'microphone', input_id: micSel.value, status: 'online', is_default: false });
     if (!rows.length) return flash('Choose a camera and/or microphone first.', 'error');
     const { error } = await db.client.from('devices').upsert(rows, { onConflict: 'venue_id,input_id' });
     if (error) throw error;
