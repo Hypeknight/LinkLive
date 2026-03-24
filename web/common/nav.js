@@ -10,7 +10,7 @@ window.LinkdNNav = {
     </nav>`; },
   admin() { return `<nav class="app-nav">
     <a href="/admin/dashboard.html">Dashboard</a>
-    <a href="/live/moderator/dashboard.html">Showtime</a>
+    <a href="/live/moderator/scheduling.html">Showtime</a>
     <a href="/admin/owners.html">Owners</a>
     <a href="/admin/venues.html">Venues</a>
     <a href="/admin/workers.html">Workers</a>
@@ -20,9 +20,9 @@ window.LinkdNNav = {
     <a href="/auth/login.html" id="logoutAdmin">Logout</a>
     </nav>`; },
   venue() { return `<nav class="app-nav">
-    <a href="/venue/dashboard.html">Dashboard</a>
+    <a href="/venue/dashboard.html">Venue Dashboard</a>
     <a href="../owner/dashboard.html">Home</a>
-    <a href="../live/venue/dashboard.html">Showtime</a>
+    <a href="../live/venue/rooms.html">Showtime</a>
     <a href="/venue/settings.html">Settings</a>
     <!-- <a href="/live/ops.html">LiveOps</a> -->
     <a href="/venue/workers.html">Workers</a>
