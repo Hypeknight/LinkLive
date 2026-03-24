@@ -405,15 +405,15 @@
     if (preferredCam) preferredCam.innerHTML = ui.option('', 'No default') + camDevices.map(d => ui.option(d.id, d.name || d.input_id || d.id, !!d.is_default)).join('');
     if (preferredMic) preferredMic.innerHTML = ui.option('', 'No default') + micDevices.map(d => ui.option(d.id, d.name || d.input_id || d.id, !!d.is_default)).join('');
 
-    table.innerHTML = state.devices.map(d => `<tr><td>${esc(d.name)}</td><td>${esc(d.type)}</td><td>${esc(d.input_id || '—')}</td><td>${esc(d.status)}</td><td>${d.is_default ? 'Yes' : 'No'}</td><td><button type="button" data-toggle="${d.id}">${d.status === 'disabled' ? 'Enable' : 'Disable'}</button> <button type="button" data-remove="${d.id}" class="danger">Remove</button></td></tr>`).join('') || '<tr><td colspan="6">No saved devices.</td></tr>';
+    table.innerHTML = state.devices.map(d => `<tr><td>${esc(d.name)}</td><td>${esc(d.type)}</td><td>${esc(d.input_id || '—')}</td><td>${esc(d.status)}</td><td>${d.is_default ? 'Yes' : 'No'}</td><td><button type="button" data-toggle="${d.id}">${d.status === 'offline' ? 'online' : 'offline'}</button> <button type="button" data-remove="${d.id}" class="danger">Remove</button></td></tr>`).join('') || '<tr><td colspan="6">No saved devices.</td></tr>';
 
     table.querySelectorAll('[data-toggle]').forEach(btn => btn.onclick = async () => {
       try {
         const device = state.devices.find(d => d.id === btn.dataset.toggle);
-        const next = device?.status === 'disabled' ? 'active' : 'disabled';
+        const next = device?.status === 'offline' ? 'online' : 'offline';
         const { error } = await db.client.from('devices').update({ status: next }).eq('id', btn.dataset.toggle);
         if (error) throw error;
-        flash(`Device ${next === 'active' ? 'enabled' : 'disabled'}.`);
+        flash(`Device ${next === 'online' ? 'enabled' : 'disabled'}.`);
         await refresh();
       } catch (err) { flash(err.message || 'Device update failed.', 'error'); }
     });
