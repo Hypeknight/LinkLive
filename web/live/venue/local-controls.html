@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Venue Local Controls</title>
+  <link rel="stylesheet" href="/common/app.css" />
+  <script src="/common/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/db.js"></script>
+  <script src="/common/ui.js"></script>
+  <script src="/common/auth.js"></script>
+  <script src="/live/assets/js/venue.js"></script>
+</head>
+<body data-page="venue-local-controls">
+  <div class="shell venue-shell">
+    <aside class="sidebar">
+      <div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Venue production</div></div></div>
+      <div class="badge-row"><strong data-venue-name></strong></div>
+      <nav class="nav">
+        <a href="/live/venue/rooms.html">Rooms</a>
+        <a href="/live/venue/production.html">Production</a>
+        <a href="/live/venue/display.html">Display</a>
+        <a href="/live/venue/patron-pulse.html">Patron Pulse</a>
+        <a class="active" href="/live/venue/local-controls.html">Local Controls</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="header"><div><h1>Local Controls</h1><p>Select local hardware for this venue and preview before going live.</p></div><div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline" data-connection-status>Offline</div><button id="logout-button" class="secondary" type="button">Logout</button></div></header>
+      <div id="flash-host"></div>
+      <section class="grid cols-2">
+        <article class="card">
+          <h3>Browser Devices</h3>
+          <div class="button-row"><button type="button" id="allow-browser-media-btn">Allow Camera + Mic</button><button type="button" class="secondary" id="discover-devices-btn">Refresh Devices</button><button type="button" class="secondary" id="save-local-devices-btn">Save Selected</button></div>
+          <label>Camera<select id="local-camera-device"></select></label>
+          <label>Microphone<select id="local-mic-device"></select></label>
+          <div class="button-row"><button type="button" id="preview-start-btn">Start Preview</button><button type="button" class="secondary" id="preview-stop-btn">Stop Preview</button></div>
+          <video id="local-preview-video" class="preview" autoplay muted playsinline></video>
+          <div id="local-preview-info" class="helper">Preview idle.</div>
+        </article>
+        <article class="card">
+          <h3>Venue Defaults</h3>
+          <label>Preferred Camera<select id="local-preferred-camera"></select></label>
+          <label>Preferred Microphone<select id="local-preferred-mic"></select></label>
+          <div class="button-row"><button type="button" id="save-default-devices-btn">Save Defaults</button></div>
+        </article>
+      </section>
+      <article class="card"><h3>Saved Venue Devices</h3><table><thead><tr><th>Name</th><th>Type</th><th>Input</th><th>Status</th><th>Default</th><th>Actions</th></tr></thead><tbody id="local-devices-table"></tbody></table></article>
+    </main>
+  </div>
+</body>
+</html>

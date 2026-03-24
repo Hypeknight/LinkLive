@@ -38,13 +38,13 @@
     },
 
     async update(table, id, payload) {
-      const { error } = await client.from(table).update(payload).match(match);
-      if (error) throw error;
+    const { error } = await client.from(table).update(payload).eq('id', id);
+    if (error) throw error;
     },
 
-    async delete(table, match) {
-      const { error } = await client.from(table).delete().match(match);
-      if (error) throw error;
+    async remove(table, id) {
+    const { error } = await client.from(table).delete().eq('id', id);
+    if (error) throw error;
     },
 
     subscribe(table, handler) {

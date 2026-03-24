@@ -1,120 +1,57 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Rooms</title>
-        <link rel="stylesheet" href="/common/app.css">
-        <script src="/common/config.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-        <script src="/common/supabase.js"></script>
-        <script src="/common/db.js"></script>
-        <script src="/common/ui.js"></script>
-        <script src="/common/auth.js"></script>
-        <script src="/live/assets/js/moderator.js"></script>
-    </head>
-    <body data-page="moderator-rooms">
-        <div class="shell">
-            <aside class="sidebar">
-                <div class="brand-row">
-                    <span class="brand-mark"></span>
-                    <div>
-                        <div class="brand" data-app-name></div>
-                        <div class="sub">Moderator side</div>
-                    </div>
-                </div>
-                <nav class="nav">
-            <a href="/live/moderator/dashboard.html">Dashboard</a>
-            <a class="active" href="/live/moderator/rooms.html">Rooms</a>
-            <a href="/live/moderator/scheduling.html">Scheduling</a>
-            <a href="/live/moderator/ops.html">Ops</a>
-            <a href="/live/moderator/patron-pulse.html">Patron Pulse</a>
-            <a href="/live/moderator/local-controls.html">Local Controls</a>
-            <a href="/live/moderator/device-settings.html">Device Settings</a>
-            <!-- <a href="/venue/dashboard.html">Venue View</a> -->
-        </nav>
-            </aside>
-            <main class="main">
-  <header class="header">
-    <div>
-      <h1>Rooms</h1>
-      <p>Create rooms, assign camera/mic devices, and change live status.</p>
-    </div>
-    <div class="header-right">
-      <div id="current-user"></div>
-      <div id="connection-state" class="connection offline"></div>
-      <button id="logout-button" class="secondary">Logout</button>
-    </div>
-  </header>
-
-  <div id="flash-host"></div>
-
-  <section class="grid cols-2">
-    <article class="card">
-      <h3 id="room-form-title">Add Room</h3>
-      <form id="room-form" class="stack">
-        <label>
-          Name
-          <input name="title" required />
-        </label>
-
-        <label>
-          Zone
-          <input name="zone" />
-        </label>
-
-        <label>
-          Capacity
-          <input type="number" name="capacity" min="0" value="0" />
-        </label>
-
-        <label>
-          Status
-          <select name="status">
-            <option value="scheduled">scheduled</option>
-            <option value="live">live</option>
-            <option value="completed">completed</option>
-            <option value="cancelled">cancelled</option>
-          </select>
-        </label>
-
-        <label>
-          Assigned Camera
-          <select name="assigned_camera_id"></select>
-        </label>
-
-        <label>
-          Assigned Microphone
-          <select name="assigned_mic_id"></select>
-        </label>
-
-        <div class="button-row">
-          <button type="submit">Save Room</button>
-          <button type="button" class="secondary" id="room-form-reset">Reset</button>
-        </div>
-      </form>
-    </article>
-
-    <article class="card">
-      <h3>Rooms</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Zone</th>
-            <th>Capacity</th>
-            <th>Status</th>
-            <th>Camera</th>
-            <th>Mic</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="rooms-table-body">
-        </tbody>
-      </table>
-    </article>
-  </section>
-</main>
-        </div >
-    </body >
-</html >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moderator Rooms</title>
+  <link rel="stylesheet" href="/common/app.css" />
+  <script src="/common/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/db.js"></script>
+  <script src="/common/ui.js"></script>
+  <script src="/common/auth.js"></script>
+  <script src="/live/assets/js/moderator.js"></script>
+</head>
+<body data-page="moderator-rooms">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Moderator production</div></div></div>
+      <nav class="nav"><a href="/live/moderator/rooms.html" class="active">Rooms</a><a href="/live/moderator/scheduling.html">Scheduling</a></nav>
+    </aside>
+    <main class="main">
+      <header class="header"><div><h1>Room Production Control</h1><p>Create rooms, oversee live feeds, manage pulses, messages, and production state.</p></div><div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline" data-connection-status>Offline</div><button id="logout-button" class="secondary" type="button">Logout</button></div></header>
+      <div id="flash-host"></div>
+      <section class="grid cols-2">
+        <article class="card">
+          <h3 id="room-form-title">Create Room</h3>
+          <form id="room-form" class="stack">
+            <label>Title<input name="title" required /></label>
+            <label>Slug<input name="slug" /></label>
+            <label>Timezone / Region<input name="zone" placeholder="America/Chicago" /></label>
+            <label>Capacity<input name="capacity" type="number" min="0" value="5" /></label>
+            <label>Status<select name="status"><option value="scheduled">scheduled</option><option value="live">live</option><option value="completed">completed</option><option value="cancelled">cancelled</option></select></label>
+            <label>Notes<textarea name="notes" rows="4"></textarea></label>
+            <label><input type="checkbox" name="is_active" checked /> Active room</label>
+            <div class="button-row"><button type="submit">Save Room</button><button type="button" id="room-form-reset" class="secondary">Reset</button></div>
+          </form>
+        </article>
+        <article class="card"><h3>Rooms</h3><table><thead><tr><th>Title</th><th>Zone</th><th>Status</th><th>Connected</th><th>Live</th><th>Actions</th></tr></thead><tbody id="moderator-rooms-table-body"></tbody></table></article>
+      </section>
+      <section class="card">
+        <h3>Manage Production</h3>
+        <label>Room<select id="manage-room-id"></select></label>
+        <div id="manage-room-summary" class="stats-grid"></div>
+      </section>
+      <section class="grid cols-2">
+        <article class="card"><h3>Connected Venues</h3><table><thead><tr><th>Venue</th><th>Status</th><th>Feed</th><th>Actions</th></tr></thead><tbody id="manage-room-venues"></tbody></table></article>
+        <article class="card"><h3>Pulse Management</h3><div id="manage-room-pulse"></div><form id="pulse-form" class="stack"><input type="hidden" name="room_id" /><label>Prompt<input name="prompt_text" required /></label><label>Type<select name="prompt_type"><option value="vote">vote</option><option value="hype">hype</option><option value="comment">comment</option></select></label><label>Ends At<input type="datetime-local" name="ends_at" /></label><label><input type="checkbox" name="allow_comments" checked /> Allow comments</label><label><input type="checkbox" name="allow_hype" checked /> Allow hype</label><div class="button-row"><button type="submit">Send Pulse</button></div></form></article>
+      </section>
+      <section class="grid cols-2">
+        <article class="card"><h3>Room Messages</h3><form id="moderator-message-form" class="button-row"><input type="hidden" name="room_id" /><input name="body" placeholder="Message connected venues" /><button type="submit">Send</button></form><table><thead><tr><th>From</th><th>Body</th><th>Time</th></tr></thead><tbody id="manage-room-messages"></tbody></table></article>
+        <article class="card"><h3>Production Override</h3><form id="show-state-form" class="stack"><input type="hidden" name="room_id" /><label>Current Segment<input name="current_segment" /></label><label>Current Round<input name="current_round" /></label><label>Event Type<select name="event_type"><option value="rotation">rotation</option><option value="battle">battle</option><option value="freeplay">freeplay</option><option value="stopped">stopped</option></select></label><label>Remaining Seconds<input type="number" name="remaining_seconds" min="0" value="0" /></label><label><input type="checkbox" name="portal_open" /> Portal open</label><label><input type="checkbox" name="timer_running" /> Timer running</label><div class="button-row"><button type="submit">Save State</button><button type="button" id="production-override-stop" class="danger">Hard Stop</button></div></form></article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

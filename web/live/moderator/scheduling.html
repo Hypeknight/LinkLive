@@ -1,120 +1,46 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Scheduling</title>
-        <link rel="stylesheet" href="/common/app.css">
-        <script src="/common/config.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-        <script src="/common/supabase.js"></script>
-        <script src="/common/db.js"></script>
-        <script src="/common/ui.js"></script>
-        <script src="/common/auth.js"></script>
-        <script src="/live/assets/js/moderator.js"></script>
-    </head>
-    <body data-page="moderator-scheduling">
-        <div class="shell">
-            <aside class="sidebar">
-                <div class="brand-row">
-                    <span class="brand-mark"></span>
-                    <div>
-                        <div class="brand" data-app-name></div>
-                        <div class="sub">Moderator side</div>
-                    </div>
-                </div>
-                <nav class="nav">
-            <a href="/live/moderator/dashboard.html">Dashboard</a>
-            <a href="/live/moderator/rooms.html">Rooms</a>
-            <a class="active" href="/live/moderator/scheduling.html">Scheduling</a>
-            <a href="/live/moderator/ops.html">Ops</a>
-            <a href="/live/moderator/patron-pulse.html">Patron Pulse</a>
-            <a href="/live/moderator/local-controls.html">Local Controls</a>
-            <a href="/live/moderator/device-settings.html">Device Settings</a>
-            <!-- <a href="/venue/dashboard.html">Venue View</a> -->
-        </nav>
-            </aside>
-            <main class="main">
-  <header class="header">
-    <div>
-      <h1>Scheduling</h1>
-      <p>Create and control room schedule blocks.</p>
-    </div>
-    <div class="header-right">
-      <div id="current-user"></div>
-      <div id="connection-state" class="connection offline"></div>
-      <button id="logout-button" class="secondary">Logout</button>
-    </div>
-  </header>
-
-  <div id="flash-host"></div>
-
-  <section class="grid cols-2">
-    <article class="card">
-      <h3 id="schedule-form-title">Add Schedule Block</h3>
-      <form id="schedule-form" class="stack">
-        <label>
-          Title
-          <input name="title" required />
-        </label>
-
-        <label>
-          Room
-          <select name="room_id"></select>
-        </label>
-
-        <label>
-          Start
-          <input type="datetime-local" name="start_at" required />
-        </label>
-
-        <label>
-          End
-          <input type="datetime-local" name="end_at" />
-        </label>
-
-        <label>
-          Lead Name
-          <input name="lead_name" />
-        </label>
-
-        <label>
-          Status
-          <select name="status">
-            <option value="scheduled">scheduled</option>
-            <option value="live">live</option>
-            <option value="completed">completed</option>
-            <option value="cancelled">cancelled</option>
-          </select>
-        </label>
-
-        <div class="button-row">
-          <button type="submit">Save Schedule</button>
-          <button type="button" class="secondary" id="schedule-form-reset">Reset</button>
-        </div>
-      </form>
-    </article>
-
-    <article class="card">
-      <h3>Schedule</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Room</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Lead</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="schedule-table-body">
-        </tbody>
-      </table>
-    </article>
-  </section>
-</main>
-        </div >
-    </body >
-</html >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moderator Scheduling</title>
+  <link rel="stylesheet" href="/common/app.css" />
+  <script src="/common/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/db.js"></script>
+  <script src="/common/ui.js"></script>
+  <script src="/common/auth.js"></script>
+  <script src="/live/assets/js/moderator.js"></script>
+</head>
+<body data-page="moderator-scheduling">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Moderator production</div></div></div>
+      <nav class="nav"><a href="/live/moderator/rooms.html">Rooms</a><a href="/live/moderator/scheduling.html" class="active">Scheduling</a></nav>
+    </aside>
+    <main class="main">
+      <header class="header"><div><h1>Master Scheduling</h1><p>Control room production timing with room-aware schedules and timezone context.</p></div><div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline" data-connection-status>Offline</div><button id="logout-button" class="secondary" type="button">Logout</button></div></header>
+      <div id="flash-host"></div>
+      <section class="grid cols-2">
+        <article class="card">
+          <h3 id="schedule-form-title">Create Schedule Segment</h3>
+          <div class="button-row"><button type="button" data-quick-segment="Open Rotation" data-segment-type="rotation">Quick: Open Rotation</button><button type="button" data-quick-segment="Battle Window" data-segment-type="battle">Quick: Battle</button><button type="button" data-quick-segment="Regional Rotation" data-segment-type="rotation">Quick: Regional Rotation</button></div>
+          <form id="schedule-form" class="stack">
+            <label>Room<select id="schedule-room-id" name="room_id"></select></label>
+            <label>Segment Title<input name="segment_title" required /></label>
+            <label>Segment Type<select name="segment_type"><option value="rotation">rotation</option><option value="battle">battle</option><option value="freeplay">freeplay</option><option value="announcement">announcement</option></select></label>
+            <label>Description<textarea name="description" rows="4"></textarea></label>
+            <label>Starts At<input type="datetime-local" name="starts_at" required /></label>
+            <label>Ends At<input type="datetime-local" name="end_at" /></label>
+            <label>Sort Order<input type="number" name="sort_order" value="0" /></label>
+            <label>Lead Name<input name="lead_name" /></label>
+            <div class="button-row"><button type="submit">Save Segment</button><button type="button" id="schedule-form-reset" class="secondary">Reset</button></div>
+          </form>
+        </article>
+        <article class="card"><h3>Room Schedule</h3><table><thead><tr><th>Room</th><th>Segment</th><th>Type</th><th>Start</th><th>End</th><th>Timezone</th><th>Actions</th></tr></thead><tbody id="schedule-table-body"></tbody></table></article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

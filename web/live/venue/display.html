@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Venue Rooms</title>
+  <title>Venue Display</title>
   <link rel="stylesheet" href="/common/app.css" />
   <script src="/common/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,27 +13,22 @@
   <script src="/common/auth.js"></script>
   <script src="/live/assets/js/venue.js"></script>
 </head>
-<body data-page="venue-rooms">
+<body data-page="venue-display">
   <div class="shell venue-shell">
     <aside class="sidebar">
       <div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Venue production</div></div></div>
       <div class="badge-row"><strong data-venue-name></strong></div>
       <nav class="nav">
-        <a class="active" href="/live/venue/rooms.html">Rooms</a>
+        <a href="/live/venue/rooms.html">Rooms</a>
         <a href="/live/venue/production.html">Production</a>
-        <a href="/live/venue/display.html">Display</a>
+        <a class="active" href="/live/venue/display.html">Display</a>
         <a href="/live/venue/patron-pulse.html">Patron Pulse</a>
         <a href="/live/venue/local-controls.html">Local Controls</a>
       </nav>
     </aside>
     <main class="main">
-      <header class="header">
-        <div><h1>Choose a Room</h1><p>Select the room this venue will join. A venue can only be connected to one room at a time.</p></div>
-        <div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline" data-connection-status>Offline</div><button id="logout-button" class="secondary" type="button">Logout</button></div>
-      </header>
-      <div id="flash-host"></div>
-      <article class="card" id="current-room-banner"></article>
-      <section class="grid cols-3" id="rooms-grid"></section>
+      <header class="header"><div><h1>Venue Display</h1><p>Feed for the in-club monitor. Two venues defaults to the opposite venue; more than two uses room display mode.</p></div><div class="header-right"><div id="connection-state" class="connection offline" data-connection-status>Offline</div><span id="display-mode">auto</span></div></header>
+      <section class="card"><h2 id="display-room-title">No room selected</h2><div id="display-layout" class="grid cols-2"></div></section>
     </main>
   </div>
 </body>

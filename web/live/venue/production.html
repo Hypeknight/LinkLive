@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Venue Production</title>
+  <link rel="stylesheet" href="/common/app.css" />
+  <script src="/common/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/db.js"></script>
+  <script src="/common/ui.js"></script>
+  <script src="/common/auth.js"></script>
+  <script src="/live/assets/js/venue.js"></script>
+</head>
+<body data-page="venue-production">
+  <div class="shell venue-shell">
+    <aside class="sidebar">
+      <div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Venue production</div></div></div>
+      <div class="badge-row"><strong data-venue-name></strong></div>
+      <nav class="nav">
+        <a href="/live/venue/rooms.html">Rooms</a>
+        <a class="active" href="/live/venue/production.html">Production</a>
+        <a href="/live/venue/display.html">Display</a>
+        <a href="/live/venue/patron-pulse.html">Patron Pulse</a>
+        <a href="/live/venue/local-controls.html">Local Controls</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="header">
+        <div><h1>Production Controls</h1><p>Main control surface for live venue operation.</p></div>
+        <div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline" data-connection-status>Offline</div><button id="logout-button" class="secondary" type="button">Logout</button></div>
+      </header>
+      <div id="flash-host"></div>
+      <section class="grid cols-3">
+        <article class="card">
+          <h3>Room Status</h3>
+          <p><strong>Room:</strong> <span id="production-room-name">No room selected</span></p>
+          <p><strong>Feed:</strong> <span id="production-room-status">Idle</span></p>
+          <div class="button-row">
+            <button type="button" id="start-feed-btn">Start Feed</button>
+            <button type="button" class="secondary" id="stop-feed-btn">Stop Feed</button>
+          </div>
+        </article>
+        <article class="card"><h3>Current Pulse</h3><div id="production-pulse-card"></div></article>
+        <article class="card">
+          <h3>Room Messages</h3>
+          <div class="button-row">
+            <input id="production-message-input" placeholder="Message connected venues / moderator" />
+            <button type="button" id="send-message-btn">Send</button>
+          </div>
+        </article>
+      </section>
+      <section class="grid cols-2">
+        <article class="card">
+          <h3>Production Schedule</h3>
+          <table><thead><tr><th>Segment</th><th>Start</th><th>End</th><th>Type</th></tr></thead><tbody id="production-schedule-list"></tbody></table>
+        </article>
+        <article class="card">
+          <h3>Connected Venues</h3>
+          <table><thead><tr><th>Venue</th><th>Status</th><th>Feed</th></tr></thead><tbody id="production-venues-list"></tbody></table>
+        </article>
+      </section>
+      <section class="card">
+        <h3>Latest Messages</h3>
+        <table><thead><tr><th>From</th><th>Message</th><th>Time</th></tr></thead><tbody id="production-message-list"></tbody></table>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
