@@ -314,29 +314,30 @@
   }
 
   function evaluatePresence() {
-    const stored = getStoredPresence();
-    const statusEl = document.getElementById('pv-checkin-status');
+  const stored = getStoredPresence();
+  const statusEl = document.getElementById('pv-checkin-status');
 
-    const valid =
-      stored &&
-      String(stored.venueId) === String(state.venueId) &&
-      stored.expiresAt &&
-      new Date(stored.expiresAt).getTime() > Date.now();
+  const valid =
+    stored &&
+    String(stored.venueId) === String(state.venueId) &&
+    stored.expiresAt &&
+    new Date(stored.expiresAt).getTime() > Date.now();
 
-    state.verified = !!valid;
-    state.presenceSessionId = valid ? stored.presenceSessionId || null : null;
+  state.verified = !!valid;
+  state.presenceSessionId = valid ? stored.presenceSessionId || null : null;
 
-    if (statusEl) {
-      statusEl.textContent = valid ? 'Venue verified' : 'Venue verification required';
-    }
-
-    if (!valid) {
-      const nextUrl = `${location.origin}/public/pulse-checkin.html?room=${encodeURIComponent(state.roomId || '')}&venue=${encodeURIComponent(state.venueId || '')}${state.promptId ? `&prompt=${encodeURIComponent(state.promptId)}` : ''}`;
-      showNotice(`You must verify you’re at the venue before voting, commenting, or sending DJ requests. Go to: ${nextUrl}`, true);
-    } else {
-      showNotice('Verified at venue. You can participate in this live pulse.');
-    }
+  if (statusEl) {
+    statusEl.textContent = valid ? 'Venue verified' : 'Venue verification required';
   }
+
+  if (!valid) {
+    const nextUrl = `${location.origin}/public/pulse-checkin.html?room=${encodeURIComponent(state.roomId || '')}&venue=${encodeURIComponent(state.venueId || '')}${state.promptId ? `&prompt=${encodeURIComponent(state.promptId)}` : ''}`;
+    window.location.href = nextUrl;
+    return;
+  }
+
+  showNotice('Verified at venue. You can participate in this live pulse.');
+}
 
   async function bootVotePage() {
     readParams();

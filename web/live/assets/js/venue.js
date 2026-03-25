@@ -1526,7 +1526,7 @@ function displayVoteUrl() {
     venue: venueId,
   });
   if (promptId) qs.set('prompt', promptId);
-  return `${location.origin}/public/pulse-vote.html?${qs.toString()}`;
+  return `${location.origin}/public/pulse-checkin.html?${qs.toString()}`;
 }
 
 function clearDisplayTimer() {
@@ -1670,8 +1670,16 @@ function renderDisplayInfo() {
 
   const voteUrl = displayVoteUrl();
   if (voteUrlEl) {
-    voteUrlEl.textContent = voteUrl;
-  }
+  voteUrlEl.innerHTML = `
+    <div><strong>Scan to verify and vote live</strong></div>
+    <div style="margin-top:6px; font-size:12px; opacity:.8;">
+      Guests must verify they are at the venue before voting, commenting, or sending DJ requests.
+    </div>
+    <div style="margin-top:8px; font-size:12px; opacity:.7; word-break:break-word;">
+      ${voteUrl}
+    </div>
+  `;
+}
 
   if (qrCanvas && window.QRious) {
     new window.QRious({

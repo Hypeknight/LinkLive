@@ -46,16 +46,29 @@
 <body data-public-page="pulse-checkin">
   <main class="checkin-shell">
     <article class="checkin-card">
-      <h1>Verify You’re At The Venue</h1>
-      <p>Enter the venue code shown on the in-house screen to unlock voting, comments, hype, and DJ requests.</p>
+  <h1>Verify You’re At The Venue</h1>
+  <p>
+    Enter the venue code shown on the in-house screen to unlock:
+  </p>
 
-      <div class="stack">
-        <input id="pc-code" type="text" placeholder="Enter venue code" />
-        <button id="pc-submit" type="button">Verify Presence</button>
-      </div>
+  <ul style="line-height:1.8; margin: 0 0 16px 18px;">
+    <li>Live voting</li>
+    <li>Pulse comments</li>
+    <li>DJ requests</li>
+    <li>HypeMeter interaction</li>
+  </ul>
 
-      <div id="pc-status" style="margin-top:14px;">Waiting for code…</div>
-    </article>
+  <p>
+    Only verified guests at the venue can influence in-room pulse, comments, and hype.
+  </p>
+
+  <div class="stack">
+    <input id="pc-code" type="text" placeholder="Enter venue code" />
+    <button id="pc-submit" type="button">Verify Presence</button>
+  </div>
+
+  <div id="pc-status" style="margin-top:14px;">Waiting for code…</div>
+</article>
   </main>
 </body>
 </html>
