@@ -13,6 +13,7 @@
     comments: [],
     verified: false,
     presenceSessionId: null,
+    presenceSessionToken: null,
     timerHandle: null,
   };
 
@@ -58,11 +59,17 @@
     localStorage.setItem(getGuestSessionKey(), JSON.stringify(data));
   }
 
+  function clearPresence() {
+    localStorage.removeItem(getGuestSessionKey());
+  }
+
   function markPromptVoted(promptId) {
+    if (!promptId) return;
     sessionStorage.setItem(getVoteSessionKey(promptId), '1');
   }
 
   function hasPromptVoted(promptId) {
+    if (!promptId) return false;
     return sessionStorage.getItem(getVoteSessionKey(promptId)) === '1';
   }
 
@@ -80,51 +87,32 @@
     state.promptId = p.get('prompt') || '';
   }
 
-async function sendComment(text) {
-  const presence = getStoredPresence();
+  function randomGuestSessionToken() {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  }
 
-  const { error } = await db.client.from('patron_comments').insert({
-    room_id: presence.roomId,
-    venue_id: presence.venueId,
-    session_token: presence.sessionToken,
-    comment: text
-  });
+  async function loadCheckinContext() {
+    const params = qs();
+    const roomId = params.get('room') || '';
+    const venueId = params.get('venue') || '';
 
-  if (error) throw error;
-}
+    let venue = null;
+    let room = null;
 
-async function sendDJRequest(song, artist) {
-  const presence = getStoredPresence();
+    if (venueId) {
+      const venueRes = await db.client.from('venues').select('*').eq('id', venueId).maybeSingle();
+      if (venueRes.error) throw venueRes.error;
+      venue = venueRes.data || null;
+    }
 
-  const { error } = await db.client.from('dj_requests').insert({
-    room_id: presence.roomId,
-    venue_id: presence.venueId,
-    session_token: presence.sessionToken,
-    song,
-    artist
-  });
+    if (roomId) {
+      const roomRes = await db.client.from('rooms').select('*').eq('id', roomId).maybeSingle();
+      if (roomRes.error) throw roomRes.error;
+      room = roomRes.data || null;
+    }
 
-  if (error) throw error;
-}
-
-async function submitPulse({ score, energy, crowd }) {
-  const presence = getStoredPresence();
-
-  const { error } = await db.client.from('patron_pulse').insert({
-    venue_id: presence.venueId,
-    room_id: presence.roomId,
-    pulse_score: score,
-    energy_level: energy,
-    crowd_count: crowd,
-    source: 'guest'
-  });
-
-  if (error) throw error;
-}
-
-function randomGuestSessionToken() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-}
+    return { venue, room };
+  }
 
   async function loadCore() {
     const venueRes = state.venueId
@@ -156,13 +144,26 @@ function randomGuestSessionToken() {
       .order('created_at', { ascending: false })
       .limit(50);
 
-    const [promptRes, pulseRes] = await Promise.all([promptQuery.maybeSingle(), pulseQuery]);
+    const commentsQuery = db.client
+      .from('pulse_comments')
+      .select('*')
+      .eq('room_id', state.roomId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    const [promptRes, pulseRes, commentsRes] = await Promise.all([
+      promptQuery.maybeSingle(),
+      pulseQuery,
+      commentsQuery
+    ]);
 
     if (promptRes.error) throw promptRes.error;
     if (pulseRes.error) throw pulseRes.error;
+    if (commentsRes.error) throw commentsRes.error;
 
     state.prompt = promptRes.data || null;
     state.pulseRows = pulseRes.data || [];
+    state.comments = commentsRes.data || [];
 
     if (!state.promptId && state.prompt?.id) {
       state.promptId = state.prompt.id;
@@ -223,30 +224,6 @@ function randomGuestSessionToken() {
     state.timerHandle = setInterval(tick, 1000);
   }
 
-async function loadCheckinContext() {
-  const params = qs();
-  const roomId = params.get('room') || '';
-  const venueId = params.get('venue') || '';
-
-  let venue = null;
-  let room = null;
-
-  if (venueId) {
-    const venueRes = await db.client.from('venues').select('*').eq('id', venueId).maybeSingle();
-    if (venueRes.error) throw venueRes.error;
-    venue = venueRes.data || null;
-  }
-
-  if (roomId) {
-    const roomRes = await db.client.from('rooms').select('*').eq('id', roomId).maybeSingle();
-    if (roomRes.error) throw roomRes.error;
-    room = roomRes.data || null;
-  }
-
-  return { venue, room };
-}
-
-
   function renderVoteActions() {
     const host = document.getElementById('pv-vote-actions');
     const status = document.getElementById('pv-vote-status');
@@ -283,9 +260,21 @@ async function loadCheckinContext() {
         try {
           if (!state.verified) throw new Error('Presence not verified.');
           if (!state.promptId) throw new Error('No active pulse prompt.');
+          if (!state.presenceSessionId) throw new Error('No verified guest session found.');
           if (hasPromptVoted(state.promptId)) throw new Error('You already voted in this pulse.');
 
-          // Placeholder for backend-enforced vote insert later
+          const optionId = btn.dataset.vote;
+
+          const { error } = await db.client.from('patron_votes').insert({
+            prompt_id: state.promptId,
+            poll_id: state.promptId,
+            option_id: optionId,
+            voter_session_id: state.presenceSessionToken || state.presenceSessionId,
+            presence_session_id: state.presenceSessionId
+          });
+
+          if (error) throw error;
+
           markPromptVoted(state.promptId);
           renderVoteActions();
           showNotice('Vote received.');
@@ -321,11 +310,14 @@ async function loadCheckinContext() {
     const host = document.getElementById('pv-comments');
     if (!host) return;
 
-    host.innerHTML = `
-      <div class="comment-item">
-        Comments will appear here once comment storage is connected.
-      </div>
-    `;
+    host.innerHTML = state.comments.length
+      ? state.comments.map(c => `
+          <div class="comment-item">
+            <div>${esc(c.body || c.comment || '')}</div>
+            <div class="comment-time">${fmt(c.created_at)}</div>
+          </div>
+        `).join('')
+      : `<div class="comment-item">No comments yet.</div>`;
   }
 
   function renderOtherPulses() {
@@ -354,9 +346,21 @@ async function loadCheckinContext() {
       try {
         if (!state.verified) throw new Error('Verify presence before commenting.');
         if (!input.value.trim()) throw new Error('Enter a comment first.');
+        if (!state.presenceSessionId) throw new Error('No verified guest session found.');
 
-        // Placeholder until pulse_comments table + insert policy is live
+        const { error } = await db.client.from('pulse_comments').insert({
+          prompt_id: state.promptId || null,
+          venue_id: state.venueId,
+          room_id: state.roomId || null,
+          presence_session_id: state.presenceSessionId,
+          body: input.value.trim()
+        });
+
+        if (error) throw error;
+
         input.value = '';
+        await loadCore();
+        renderComments();
         showNotice('Comment received.');
       } catch (err) {
         showNotice(err.message || 'Comment failed.', true);
@@ -373,8 +377,17 @@ async function loadCheckinContext() {
       try {
         if (!state.verified) throw new Error('Verify presence before sending DJ requests.');
         if (!input.value.trim()) throw new Error('Enter a request first.');
+        if (!state.presenceSessionId) throw new Error('No verified guest session found.');
 
-        // Placeholder until dj_requests table + insert policy is live
+        const { error } = await db.client.from('dj_requests').insert({
+          venue_id: state.venueId,
+          room_id: state.roomId || null,
+          presence_session_id: state.presenceSessionId,
+          request_text: input.value.trim()
+        });
+
+        if (error) throw error;
+
         input.value = '';
         showNotice('DJ request received.');
       } catch (err) {
@@ -384,36 +397,42 @@ async function loadCheckinContext() {
   }
 
   function evaluatePresence() {
-  const stored = getStoredPresence();
-  const statusEl = document.getElementById('pv-checkin-status');
+    const stored = getStoredPresence();
+    const statusEl = document.getElementById('pv-checkin-status');
 
-  const valid =
-    stored &&
-    String(stored.venueId) === String(state.venueId) &&
-    stored.expiresAt &&
-    new Date(stored.expiresAt).getTime() > Date.now();
+    const valid =
+      stored &&
+      String(stored.venueId) === String(state.venueId) &&
+      stored.expiresAt &&
+      new Date(stored.expiresAt).getTime() > Date.now();
 
-  state.verified = !!valid;
-  state.presenceSessionId = valid ? stored.presenceSessionId || null : null;
+    state.verified = !!valid;
+    state.presenceSessionId = valid ? stored.presenceSessionId || null : null;
+    state.presenceSessionToken = valid ? stored.sessionToken || null : null;
 
-  if (statusEl) {
-    statusEl.textContent = valid ? 'Venue verified' : 'Venue verification required';
+    if (statusEl) {
+      statusEl.textContent = valid ? 'Venue verified' : 'Venue verification required';
+    }
+
+    if (!valid) {
+      clearPresence();
+      const nextUrl = `${location.origin}/public/pulse-checkin.html?room=${encodeURIComponent(state.roomId || '')}&venue=${encodeURIComponent(state.venueId || '')}${state.promptId ? `&prompt=${encodeURIComponent(state.promptId)}` : ''}`;
+      window.location.href = nextUrl;
+      return false;
+    }
+
+    showNotice('Verified at venue. You can participate in this live pulse.');
+    return true;
   }
-
-  if (!valid) {
-    const nextUrl = `${location.origin}/public/pulse-checkin.html?room=${encodeURIComponent(state.roomId || '')}&venue=${encodeURIComponent(state.venueId || '')}${state.promptId ? `&prompt=${encodeURIComponent(state.promptId)}` : ''}`;
-    window.location.href = nextUrl;
-    return;
-  }
-
-  showNotice('Verified at venue. You can participate in this live pulse.');
-}
 
   async function bootVotePage() {
     readParams();
     await loadCore();
     renderHeader();
-    evaluatePresence();
+
+    const ok = evaluatePresence();
+    if (!ok) return;
+
     renderPrompt();
     renderVoteActions();
     renderHype();
@@ -423,132 +442,132 @@ async function loadCheckinContext() {
     bindDjRequestSubmit();
   }
 
-async function bootCheckinPage() {
-  const submit = document.getElementById('pc-submit');
-  const input = document.getElementById('pc-code');
-  const status = document.getElementById('pc-status');
-  if (!submit || !input || !status) return;
+  async function bootCheckinPage() {
+    const submit = document.getElementById('pc-submit');
+    const input = document.getElementById('pc-code');
+    const status = document.getElementById('pc-status');
+    if (!submit || !input || !status) return;
 
-  const params = qs();
-  const roomId = params.get('room') || '';
-  const venueId = params.get('venue') || '';
-  const promptId = params.get('prompt') || '';
-
-  try {
-    const ctx = await loadCheckinContext();
-    if (ctx.venue || ctx.room) {
-      status.innerHTML = `
-        <div><strong>Venue:</strong> ${esc(ctx.venue?.name || 'Unknown')}</div>
-        <div><strong>Room:</strong> ${esc(ctx.room?.title || 'Unknown')}</div>
-        <div style="margin-top:8px;">Enter the venue code shown on screen.</div>
-      `;
-    }
-  } catch (err) {
-    status.textContent = err.message || 'Unable to load venue details.';
-  }
-
-  submit.onclick = async () => {
-    const code = input.value.trim().toUpperCase();
-
-    if (!venueId) {
-      status.textContent = 'Missing venue in QR/check-in link.';
-      return;
-    }
-
-    if (!code) {
-      status.textContent = 'Enter a code first.';
-      return;
-    }
-
-    submit.disabled = true;
+    const params = qs();
+    const roomId = params.get('room') || '';
+    const venueId = params.get('venue') || '';
+    const promptId = params.get('prompt') || '';
 
     try {
-      const nowIso = new Date().toISOString();
-
-      status.textContent = 'Checking code…';
-
-      const { data: codeRows, error: codeError } = await db.client
-        .from('venue_checkin_codes')
-        .select('*')
-        .eq('venue_id', venueId)
-        .eq('is_active', true)
-        .eq('code', code)
-        .gt('expires_at', nowIso)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (codeError) {
-        console.error('venue_checkin_codes lookup error:', codeError);
-        throw new Error(`Code lookup failed: ${codeError.message}`);
+      const ctx = await loadCheckinContext();
+      if (ctx.venue || ctx.room) {
+        status.innerHTML = `
+          <div><strong>Venue:</strong> ${esc(ctx.venue?.name || 'Unknown')}</div>
+          <div><strong>Room:</strong> ${esc(ctx.room?.title || 'Unknown')}</div>
+          <div style="margin-top:8px;">Enter the venue code shown on screen.</div>
+        `;
       }
+    } catch (err) {
+      status.textContent = err.message || 'Unable to load venue details.';
+    }
 
-      if (!codeRows || !codeRows.length) {
-        console.warn('No matching active code found.', {
-          venueId,
-          roomId,
-          promptId,
-          code,
-          nowIso
-        });
-        status.textContent = 'Code is invalid, expired, or for a different venue.';
+    submit.onclick = async () => {
+      const code = input.value.trim().toUpperCase();
+
+      if (!venueId) {
+        status.textContent = 'Missing venue in QR/check-in link.';
         return;
       }
 
-      const codeRow = codeRows[0];
-
-      status.textContent = 'Code valid. Creating guest session…';
-
-      const sessionToken = randomGuestSessionToken();
-      const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-
-      const insertPayload = {
-        venue_id: venueId,
-        room_id: roomId || null,
-        prompt_id: promptId || null,
-        session_token: sessionToken,
-        verification_method: 'venue_code',
-        verified_code_id: codeRow.id,
-        expires_at: expiresAt,
-        user_agent: navigator.userAgent || null
-      };
-
-      const { data: sessionRow, error: sessionError } = await db.client
-        .from('guest_presence_sessions')
-        .insert(insertPayload)
-        .select()
-        .single();
-
-      if (sessionError) {
-        console.error('guest_presence_sessions insert error:', sessionError, insertPayload);
-        throw new Error(`Session creation failed: ${sessionError.message}`);
+      if (!code) {
+        status.textContent = 'Enter a code first.';
+        return;
       }
 
-      storePresence({
-        venueId,
-        roomId,
-        promptId,
-        expiresAt,
-        presenceSessionId: sessionRow.id,
-        sessionToken
-      });
+      submit.disabled = true;
 
-      status.textContent = 'Presence verified. Redirecting…';
+      try {
+        const nowIso = new Date().toISOString();
 
-      const nextUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(roomId)}&venue=${encodeURIComponent(venueId)}${promptId ? `&prompt=${encodeURIComponent(promptId)}` : ''}`;
-      window.location.href = nextUrl;
-    } catch (err) {
-      console.error('Check-in verification failed:', err);
-      status.textContent = err.message || 'Verification failed.';
-    } finally {
-      submit.disabled = false;
-    }
-  };
-}
+        status.textContent = 'Checking code…';
+
+        const { data: codeRows, error: codeError } = await db.client
+          .from('venue_checkin_codes')
+          .select('*')
+          .eq('venue_id', venueId)
+          .eq('is_active', true)
+          .eq('code', code)
+          .gt('expires_at', nowIso)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (codeError) {
+          console.error('venue_checkin_codes lookup error:', codeError);
+          throw new Error(`Code lookup failed: ${codeError.message}`);
+        }
+
+        if (!codeRows || !codeRows.length) {
+          console.warn('No matching active code found.', {
+            venueId,
+            roomId,
+            promptId,
+            code,
+            nowIso
+          });
+          status.textContent = 'Code is invalid, expired, or for a different venue.';
+          return;
+        }
+
+        const codeRow = codeRows[0];
+
+        status.textContent = 'Code valid. Creating guest session…';
+
+        const sessionToken = randomGuestSessionToken();
+        const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+
+        const insertPayload = {
+          venue_id: venueId,
+          room_id: roomId || null,
+          prompt_id: promptId || null,
+          session_token: sessionToken,
+          verification_method: 'venue_code',
+          verified_code_id: codeRow.id,
+          expires_at: expiresAt,
+          user_agent: navigator.userAgent || null
+        };
+
+        const { data: sessionRow, error: sessionError } = await db.client
+          .from('guest_presence_sessions')
+          .insert(insertPayload)
+          .select()
+          .single();
+
+        if (sessionError) {
+          console.error('guest_presence_sessions insert error:', sessionError, insertPayload);
+          throw new Error(`Session creation failed: ${sessionError.message}`);
+        }
+
+        storePresence({
+          venueId,
+          roomId,
+          promptId,
+          expiresAt,
+          presenceSessionId: sessionRow.id,
+          sessionToken
+        });
+
+        status.textContent = 'Presence verified. Redirecting…';
+
+        const nextUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(roomId)}&venue=${encodeURIComponent(venueId)}${promptId ? `&prompt=${encodeURIComponent(promptId)}` : ''}`;
+        window.location.href = nextUrl;
+      } catch (err) {
+        console.error('Check-in verification failed:', err);
+        status.textContent = err.message || 'Verification failed.';
+      } finally {
+        submit.disabled = false;
+      }
+    };
+  }
 
   document.addEventListener('DOMContentLoaded', async () => {
     try {
       if (document.body.dataset.publicPage === 'pulse-checkin') {
-        bootCheckinPage();
+        await bootCheckinPage();
         return;
       }
 
