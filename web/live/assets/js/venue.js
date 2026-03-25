@@ -1145,6 +1145,55 @@ async function bootRooms() {
     return `lk_room_${roomId}`;
   }
 
+async function ensureActiveVenueCode() {
+  if (!state.venue?.id) return null;
+
+  const nowIso = new Date().toISOString();
+
+  const { data: existing, error: existingError } = await db.client
+    .from('venue_checkin_codes')
+    .select('*')
+    .eq('venue_id', state.venue.id)
+    .eq('is_active', true)
+    .gt('expires_at', nowIso)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing) return existing;
+
+  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const code = randomVenueCode(4);
+
+  await db.client
+    .from('venue_checkin_codes')
+    .update({ is_active: false })
+    .eq('venue_id', state.venue.id)
+    .eq('is_active', true);
+
+  const { data: created, error: createError } = await db.client
+    .from('venue_checkin_codes')
+    .insert({
+      venue_id: state.venue.id,
+      room_id: state.roomMembership?.room_id || null,
+      code,
+      starts_at: nowIso,
+      expires_at: expiresAt,
+      is_active: true,
+      created_by: state.profile?.id || null
+    })
+    .select()
+    .single();
+
+  if (createError) throw createError;
+  return created;
+}
+
+function activeVenueCodeValue() {
+  return state.checkinCode?.code || '----';
+}
+
   async function loadProfileAndVenue() {
     await auth.requireRole(db.cfg.venueRoles || ['admin', 'moderator', 'ops', 'venue', 'owner']);
     state.profile = await auth.getProfile();
@@ -1300,9 +1349,6 @@ async function bootRooms() {
     await Promise.all([loadRooms(), loadMemberships(), loadDevices()]);
     await Promise.all([loadSchedules(), loadPulse(), loadShowState(), loadMessages()]);
     state.checkinCode = await ensureActiveVenueCode();
-    function activeVenueCodeValue() {
-    return state.checkinCode?.code || '----';
-    }
     renderCurrentPage();
   }
 
@@ -1361,51 +1407,6 @@ function randomVenueCode(length = 4) {
     out += chars[Math.floor(Math.random() * chars.length)];
   }
   return out;
-}
-
-async function ensureActiveVenueCode() {
-  if (!state.venue?.id) return null;
-
-  const nowIso = new Date().toISOString();
-
-  const { data: existing, error: existingError } = await db.client
-    .from('venue_checkin_codes')
-    .select('*')
-    .eq('venue_id', state.venue.id)
-    .eq('is_active', true)
-    .gt('expires_at', nowIso)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existingError) throw existingError;
-  if (existing) return existing;
-
-  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-  const code = randomVenueCode(4);
-
-  await db.client
-    .from('venue_checkin_codes')
-    .update({ is_active: false })
-    .eq('venue_id', state.venue.id)
-    .eq('is_active', true);
-
-  const { data: created, error: createError } = await db.client
-    .from('venue_checkin_codes')
-    .insert({
-      venue_id: state.venue.id,
-      room_id: state.roomMembership?.room_id || null,
-      code,
-      starts_at: nowIso,
-      expires_at: expiresAt,
-      is_active: true,
-      created_by: state.profile?.id || null
-    })
-    .select()
-    .single();
-
-  if (createError) throw createError;
-  return created;
 }
 
   async function updateMembership(payload) {
@@ -1868,7 +1869,7 @@ function attachDisplayTrack(track, participant) {
     `).join('') || '<tr><td colspan="5">No pulse entries yet.</td></tr>';
   }
 
-  const voteUrl = `${location.origin}/venue/pulse-vote.html?room=${encodeURIComponent(state.roomMembership?.room_id || '')}&venue=${encodeURIComponent(state.venue?.id || '')}${state.prompt?.id ? `&prompt=${encodeURIComponent(state.prompt.id)}` : ''}`;
+  const voteUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(state.roomMembership?.room_id || '')}&venue=${encodeURIComponent(state.venue?.id || '')}${state.prompt?.id ? `&prompt=${encodeURIComponent(state.prompt.id)}` : ''}`;
 
   if (qr) {
     qr.textContent = voteUrl;

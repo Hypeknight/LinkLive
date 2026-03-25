@@ -80,6 +80,48 @@
     state.promptId = p.get('prompt') || '';
   }
 
+async function sendComment(text) {
+  const presence = getStoredPresence();
+
+  const { error } = await db.client.from('patron_comments').insert({
+    room_id: presence.roomId,
+    venue_id: presence.venueId,
+    session_token: presence.sessionToken,
+    comment: text
+  });
+
+  if (error) throw error;
+}
+
+async function sendDJRequest(song, artist) {
+  const presence = getStoredPresence();
+
+  const { error } = await db.client.from('dj_requests').insert({
+    room_id: presence.roomId,
+    venue_id: presence.venueId,
+    session_token: presence.sessionToken,
+    song,
+    artist
+  });
+
+  if (error) throw error;
+}
+
+async function submitPulse({ score, energy, crowd }) {
+  const presence = getStoredPresence();
+
+  const { error } = await db.client.from('patron_pulse').insert({
+    venue_id: presence.venueId,
+    room_id: presence.roomId,
+    pulse_score: score,
+    energy_level: energy,
+    crowd_count: crowd,
+    source: 'guest'
+  });
+
+  if (error) throw error;
+}
+
 function randomGuestSessionToken() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
