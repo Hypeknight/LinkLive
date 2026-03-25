@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Venue Check-In</title>
+  <link rel="stylesheet" href="/common/app.css" />
+
+  <script src="/common/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/db.js"></script>
+  <script defer src="/public/assets/js/pulse-vote.js"></script>
+
+  <style>
+    .checkin-shell {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 32px 16px 48px;
+    }
+
+    .checkin-card {
+      background: #0f172a;
+      color: #fff;
+      border-radius: 16px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      color: #fff;
+      padding: 12px;
+    }
+  </style>
+</head>
+<body data-public-page="pulse-checkin">
+  <main class="checkin-shell">
+    <article class="checkin-card">
+      <h1>Verify You’re At The Venue</h1>
+      <p>Enter the venue code shown on the in-house screen to unlock voting, comments, hype, and DJ requests.</p>
+
+      <div class="stack">
+        <input id="pc-code" type="text" placeholder="Enter venue code" />
+        <button id="pc-submit" type="button">Verify Presence</button>
+      </div>
+
+      <div id="pc-status" style="margin-top:14px;">Waiting for code…</div>
+    </article>
+  </main>
+</body>
+</html>

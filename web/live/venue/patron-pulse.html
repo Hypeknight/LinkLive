@@ -5,19 +5,147 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Venue Patron Pulse</title>
   <link rel="stylesheet" href="/common/app.css" />
+
   <script src="/common/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/common/supabase.js"></script>
   <script src="/common/db.js"></script>
   <script src="/common/ui.js"></script>
   <script src="/common/auth.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
   <script src="/live/assets/js/venue.js"></script>
+
+  <style>
+    .pulse-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 16px;
+      min-height: calc(100vh - 120px);
+    }
+
+    .pulse-left,
+    .pulse-right {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .pulse-card {
+      background: #0f172a;
+      color: #fff;
+      border-radius: 16px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .pulse-hero {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .pulse-title {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+
+    .pulse-meta {
+      color: rgba(255,255,255,.75);
+      font-size: 14px;
+    }
+
+    .pulse-timer {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .pulse-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .pulse-stat {
+      background: rgba(255,255,255,.05);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .pulse-stat strong {
+      display: block;
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+
+    .pulse-stat span {
+      color: rgba(255,255,255,.72);
+      font-size: 13px;
+    }
+
+    .pulse-qr-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 0 12px;
+    }
+
+    #venue-pulse-qr-canvas {
+      background: #fff;
+      border-radius: 12px;
+      padding: 8px;
+    }
+
+    .pulse-vote-url {
+      color: rgba(255,255,255,.72);
+      font-size: 13px;
+      word-break: break-word;
+    }
+
+    .pulse-table-wrap {
+      overflow: auto;
+    }
+
+    .pulse-table-wrap table {
+      width: 100%;
+    }
+
+    .pulse-table-wrap th,
+    .pulse-table-wrap td {
+      text-align: left;
+      padding: 10px 8px;
+      vertical-align: top;
+    }
+
+    @media (max-width: 1100px) {
+      .pulse-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .pulse-stats {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body data-page="venue-pulse">
   <div class="shell venue-shell">
     <aside class="sidebar">
-      <div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Venue production</div></div></div>
-      <div class="badge-row"><strong data-venue-name></strong></div>
+      <div class="brand-row">
+        <span class="brand-mark"></span>
+        <div>
+          <div class="brand" data-app-name></div>
+          <div class="sub">Venue pulse</div>
+        </div>
+      </div>
+
+      <div class="badge-row">
+        <strong data-venue-name></strong>
+      </div>
+
       <nav class="nav">
         <a href="/live/venue/rooms.html">Rooms</a>
         <a href="/live/venue/production.html">Production</a>
@@ -26,14 +154,101 @@
         <a href="/live/venue/local-controls.html">Local Controls</a>
       </nav>
     </aside>
+
     <main class="main">
-      <header class="header"><div><h1>Patron Pulse</h1><p>Show active pulse prompts, vote path, and venue pulse metrics.</p></div><div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline" data-connection-status>Offline</div><button id="logout-button" class="secondary" type="button">Logout</button></div></header>
+      <header class="header">
+        <div>
+          <h1>Patron Pulse</h1>
+          <p>Live audience interaction, hype, and voting.</p>
+        </div>
+
+        <div class="header-right">
+          <div id="current-user"></div>
+          <div id="connection-state" class="connection offline" data-connection-status>Offline</div>
+          <button id="logout-button" class="secondary" type="button">Logout</button>
+        </div>
+      </header>
+
       <div id="flash-host"></div>
-      <section class="grid cols-2">
-        <article class="card"><h3>Active Prompt</h3><div id="venue-pulse-prompt"></div><div id="venue-pulse-qr" style="margin-top:12px"></div></article>
-        <article class="card"><h3>Metrics</h3><div id="venue-pulse-metrics" class="stats-grid"></div></article>
+
+      <section class="pulse-shell">
+        <div class="pulse-left">
+          <article class="pulse-card pulse-hero">
+            <h3>Current Pulse</h3>
+            <div id="venue-pulse-prompt" class="pulse-title">No pulse prompt is currently live.</div>
+            <div id="venue-pulse-prompt-meta" class="pulse-meta">Waiting for room pulse…</div>
+            <div id="venue-pulse-timer" class="pulse-timer">—</div>
+          </article>
+
+          <article class="pulse-card">
+            <h3>Room Energy</h3>
+            <div id="venue-pulse-metrics" class="pulse-stats">
+              <div class="pulse-stat">
+                <strong>0%</strong>
+                <span>Pulse Score</span>
+              </div>
+              <div class="pulse-stat">
+                <strong>0</strong>
+                <span>Hype Meter</span>
+              </div>
+              <div class="pulse-stat">
+                <strong>0</strong>
+                <span>Entries</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="pulse-card">
+            <h3>Recent Pulse Activity</h3>
+            <div class="pulse-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Pulse</th>
+                    <th>Energy</th>
+                    <th>Crowd</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="venue-pulse-table">
+                  <tr>
+                    <td colspan="5">No pulse entries yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <div class="pulse-right">
+          <article class="pulse-card">
+            <h3>Vote Live</h3>
+            <p class="pulse-meta">Patrons can scan and vote from their phones throughout the night.</p>
+
+            <div class="pulse-qr-wrap">
+              <canvas id="venue-pulse-qr-canvas" width="220" height="220"></canvas>
+            </div>
+
+            <div id="venue-pulse-qr" class="pulse-vote-url">Waiting for vote link…</div>
+          </article>
+
+          <article class="pulse-card">
+            <h3>How Pulse Works</h3>
+            <div class="pulse-meta" style="line-height:1.6;">
+              <p>
+                Pulse measures the energy of the room and powers live audience participation.
+              </p>
+              <p>
+                A pulse can include voting, reactions, comments, hype scoring, or crowd-response prompts depending on what the venue and moderator allow.
+              </p>
+              <p>
+                The current live prompt appears above, and guests vote by scanning the QR code.
+              </p>
+            </div>
+          </article>
+        </div>
       </section>
-      <article class="card"><h3>Recent Pulse Entries</h3><table><thead><tr><th>Time</th><th>Pulse</th><th>Hype</th><th>Crowd</th><th>Notes</th></tr></thead><tbody id="venue-pulse-table"></tbody></table></article>
     </main>
   </div>
 </body>

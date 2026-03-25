@@ -1526,7 +1526,7 @@ function displayVoteUrl() {
     venue: venueId,
   });
   if (promptId) qs.set('prompt', promptId);
-  return `${location.origin}/venue/pulse-vote.html?${qs.toString()}`;
+  return `${location.origin}/public/pulse-vote.html?${qs.toString()}`;
 }
 
 function clearDisplayTimer() {
@@ -1733,45 +1733,95 @@ function attachDisplayTrack(track, participant) {
 }
 
 
-function renderDisplay() {
-  renderDisplayInfo();
-}
+  function renderDisplay() {
+    renderDisplayInfo();
+  }
 
   function renderPulse() {
-    const prompt = document.getElementById('venue-pulse-prompt');
-    const metrics = document.getElementById('venue-pulse-metrics');
-    const entries = document.getElementById('venue-pulse-table');
-    const qr = document.getElementById('venue-pulse-qr');
+  const prompt = document.getElementById('venue-pulse-prompt');
+  const promptMeta = document.getElementById('venue-pulse-prompt-meta');
+  const timerEl = document.getElementById('venue-pulse-timer');
+  const metrics = document.getElementById('venue-pulse-metrics');
+  const entries = document.getElementById('venue-pulse-table');
+  const qr = document.getElementById('venue-pulse-qr');
+  const qrCanvas = document.getElementById('venue-pulse-qr-canvas');
 
-    if (prompt) {
-      prompt.innerHTML = state.prompt
-        ? `<h3>${esc(state.prompt.prompt_text)}</h3><p>${esc(state.prompt.prompt_type || 'vote')}</p><p>Ends ${fmt(state.prompt.ends_at)}</p>`
-        : '<p>No pulse prompt is currently live.</p>';
-    }
+  if (prompt) {
+    prompt.textContent = state.prompt?.prompt_text || 'No pulse prompt is currently live.';
+  }
 
-    const roomPulse = state.pulses.filter(p => p.room_id === state.roomMembership?.room_id);
-    const avg = roomPulse.length ? Math.round(roomPulse.reduce((a, b) => a + Number(b.pulse_score || 0), 0) / roomPulse.length) : 0;
-    const hype = roomPulse.length ? Math.round(roomPulse.reduce((a, b) => a + Number(b.energy_level || 0), 0) / roomPulse.length) : 0;
+  if (promptMeta) {
+    const type = state.prompt?.prompt_type || 'No active vote';
+    const status = state.prompt?.status || 'idle';
+    promptMeta.textContent = `${type} • ${status}`;
+  }
 
-    if (metrics) {
-      metrics.innerHTML = `
-        <div class="stat-box"><strong>${avg}%</strong><span>Pulse Score</span></div>
-        <div class="stat-box"><strong>${hype}</strong><span>Hype Meter</span></div>
-        <div class="stat-box"><strong>${roomPulse.length}</strong><span>Entries</span></div>
-      `;
-    }
+  const roomPulse = state.pulses.filter(p => p.room_id === state.roomMembership?.room_id);
+  const avg = roomPulse.length
+    ? Math.round(roomPulse.reduce((a, b) => a + Number(b.pulse_score || 0), 0) / roomPulse.length)
+    : 0;
+  const hype = roomPulse.length
+    ? Math.round(roomPulse.reduce((a, b) => a + Number(b.energy_level || 0), 0) / roomPulse.length)
+    : 0;
 
-    if (entries) {
-      entries.innerHTML = roomPulse.map(p =>
-        `<tr><td>${fmt(p.created_at)}</td><td>${esc(p.pulse_score)}</td><td>${esc(p.energy_level)}</td><td>${esc(p.crowd_count)}</td><td>${esc(p.notes || '—')}</td></tr>`
-      ).join('') || '<tr><td colspan="5">No pulse entries yet.</td></tr>';
-    }
+  if (metrics) {
+    metrics.innerHTML = `
+      <div class="pulse-stat">
+        <strong>${avg}%</strong>
+        <span>Pulse Score</span>
+      </div>
+      <div class="pulse-stat">
+        <strong>${hype}</strong>
+        <span>Hype Meter</span>
+      </div>
+      <div class="pulse-stat">
+        <strong>${roomPulse.length}</strong>
+        <span>Entries</span>
+      </div>
+    `;
+  }
 
-    if (qr) {
-      const voteUrl = `${location.origin}/venue/pulse-vote.html?room=${encodeURIComponent(state.roomMembership?.room_id || '')}&venue=${encodeURIComponent(state.venue?.id || '')}`;
-      qr.innerHTML = `<div class="helper">Patrons can vote from their phones:</div><code>${esc(voteUrl)}</code>`;
+  if (entries) {
+    entries.innerHTML = roomPulse.map(p => `
+      <tr>
+        <td>${fmt(p.created_at)}</td>
+        <td>${esc(p.pulse_score)}</td>
+        <td>${esc(p.energy_level)}</td>
+        <td>${esc(p.crowd_count)}</td>
+        <td>${esc(p.notes || '—')}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="5">No pulse entries yet.</td></tr>';
+  }
+
+  const voteUrl = `${location.origin}/venue/pulse-vote.html?room=${encodeURIComponent(state.roomMembership?.room_id || '')}&venue=${encodeURIComponent(state.venue?.id || '')}${state.prompt?.id ? `&prompt=${encodeURIComponent(state.prompt.id)}` : ''}`;
+
+  if (qr) {
+    qr.textContent = voteUrl;
+  }
+
+  if (qrCanvas && window.QRious) {
+    new window.QRious({
+      element: qrCanvas,
+      value: voteUrl,
+      size: 220,
+      level: 'H'
+    });
+  }
+
+  if (timerEl) {
+    if (state.prompt?.ends_at) {
+      const remaining = Math.max(
+        0,
+        Math.floor((new Date(state.prompt.ends_at).getTime() - Date.now()) / 1000)
+      );
+      timerEl.textContent = formatSeconds(remaining);
+    } else if (state.showState?.timer_running && Number.isFinite(Number(state.showState?.remaining_seconds))) {
+      timerEl.textContent = formatSeconds(Number(state.showState.remaining_seconds));
+    } else {
+      timerEl.textContent = '—';
     }
   }
+}
 
   function renderLocalControls() {
     const cams = document.getElementById('local-camera-device');

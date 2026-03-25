@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linkd'N Pulse Vote</title>
+  <link rel="stylesheet" href="/common/app.css" />
+
+  <script src="/common/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/db.js"></script>
+  <script src="/common/ui.js"></script>
+  <script defer src="/public/assets/js/pulse-vote.js"></script>
+
+  <style>
+    .public-shell {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    .public-grid {
+      display: grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap: 16px;
+    }
+
+    .public-card {
+      background: #0f172a;
+      color: #fff;
+      border-radius: 16px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,.08);
+      margin-bottom: 16px;
+    }
+
+    .public-title {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .public-sub {
+      color: rgba(255,255,255,.72);
+      margin-bottom: 12px;
+    }
+
+    .public-pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      margin-right: 8px;
+      font-size: 13px;
+    }
+
+    .pulse-timer {
+      font-size: 34px;
+      font-weight: 800;
+      margin-top: 8px;
+    }
+
+    .vote-actions,
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .vote-btn {
+      width: 100%;
+      text-align: left;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.05);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .vote-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .mini-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .mini-stat {
+      background: rgba(255,255,255,.05);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .mini-stat strong {
+      display: block;
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    textarea,
+    input[type="text"] {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      color: #fff;
+      padding: 12px;
+    }
+
+    .comment-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 280px;
+      overflow: auto;
+    }
+
+    .comment-item {
+      background: rgba(255,255,255,.05);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .comment-time {
+      font-size: 12px;
+      color: rgba(255,255,255,.65);
+      margin-top: 6px;
+    }
+
+    .notice {
+      background: #1e293b;
+      color: #fff;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .public-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="public-shell">
+    <section class="public-card">
+      <div class="public-title" id="pv-venue-name">Loading venue…</div>
+      <div class="public-sub" id="pv-room-name">Loading room…</div>
+      <div>
+        <span class="public-pill" id="pv-checkin-status">Checking access…</span>
+        <span class="public-pill" id="pv-phase">Waiting…</span>
+      </div>
+    </section>
+
+    <div id="pv-notice" class="notice">
+      Verifying that you're at the venue…
+    </div>
+
+    <section class="public-grid">
+      <div>
+        <article class="public-card">
+          <h2>Current Pulse</h2>
+          <div id="pv-prompt-text" class="public-title" style="font-size:22px;">No active pulse prompt.</div>
+          <div id="pv-prompt-meta" class="public-sub">Waiting for live pulse…</div>
+          <div id="pv-timer" class="pulse-timer">—</div>
+        </article>
+
+        <article class="public-card">
+          <h2>Vote</h2>
+          <div id="pv-vote-status" class="public-sub">Vote once per pulse per verified session.</div>
+          <div id="pv-vote-actions" class="vote-actions">
+            <button class="vote-btn" disabled>No options available yet</button>
+          </div>
+        </article>
+
+        <article class="public-card">
+          <h2>Comments</h2>
+          <div class="stack">
+            <textarea id="pv-comment-input" rows="4" placeholder="Drop a live comment..."></textarea>
+            <button id="pv-comment-submit" type="button">Post Comment</button>
+          </div>
+          <hr style="margin:16px 0; border-color: rgba(255,255,255,.08);" />
+          <div id="pv-comments" class="comment-list">
+            <div class="comment-item">No comments yet.</div>
+          </div>
+        </article>
+      </div>
+
+      <div>
+        <article class="public-card">
+          <h2>HypeMeter</h2>
+          <div id="pv-hype-stats" class="mini-stats">
+            <div class="mini-stat"><strong>0%</strong><span>Venue</span></div>
+            <div class="mini-stat"><strong>0%</strong><span>Room</span></div>
+            <div class="mini-stat"><strong>0%</strong><span>City</span></div>
+          </div>
+        </article>
+
+        <article class="public-card">
+          <h2>DJ Requests</h2>
+          <div class="stack">
+            <input id="pv-dj-request-input" type="text" placeholder="Request a song, artist, or vibe..." />
+            <button id="pv-dj-request-submit" type="button">Send Request</button>
+          </div>
+        </article>
+
+        <article class="public-card">
+          <h2>Other Live Pulses</h2>
+          <div id="pv-other-pulses" class="stack">
+            <div class="comment-item">No additional pulse data yet.</div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
