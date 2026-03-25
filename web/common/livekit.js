@@ -13,23 +13,39 @@ window.LinkdNLiveKit = (() => {
   }
 
   async function fetchToken({ roomName, identity, participantName, canPublish, canSubscribe }) {
-    const res = await fetch('/api/livekit-token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        roomName,
-        identity,
-        participantName,
-        canPublish,
-        canSubscribe,
-      }),
-    });
+  const endpoint = window.LINKDN_CONFIG?.LIVEKIT_TOKEN_ENDPOINT;
+  if (!endpoint) throw new Error('LIVEKIT_TOKEN_ENDPOINT is missing from config.');
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to fetch LiveKit token');
-    }
-    return data;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      roomName,
+      identity,
+      participantName,
+      canPublish,
+      canSubscribe,
+    }),
+  });
+
+  const raw = await res.text();
+  let data = null;
+
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    throw new Error(`LiveKit token endpoint returned non-JSON response (status ${res.status}).`);
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || `Failed to fetch LiveKit token (status ${res.status}).`);
+  }
+
+  if (!data?.serverUrl || !data?.token) {
+    throw new Error('LiveKit token response is missing serverUrl or token.');
+  }
+
+  return data;
   }
 
   async function connect({ roomName, identity, participantName, canPublish = false, canSubscribe = true }) {
