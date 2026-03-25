@@ -148,3 +148,448 @@
           </table>
         </article>
       </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const db = window.LiveDB;
+      const ui = window.LiveUI;
+      const auth = window.LiveAuth;
+
+      let venueId = null;
+      let currentUser = null;
+      let currentDevices = [];
+      let currentPreferences = null;
+
+      const deviceStatus = document.getElementById('deviceStatus');
+      const cameraSelect = document.getElementById('cameraSelect');
+      const audioSelect = document.getElementById('audioSelect');
+      const preferredCamera = document.getElementById('preferredCamera');
+      const preferredAudio = document.getElementById('preferredAudio');
+      const devicesTableBody = document.getElementById('devices-table-body');
+      const manualForm = document.getElementById('manual-device-form');
+      const preferencesForm = document.getElementById('preferences-form');
+      const currentUserEl = document.getElementById('current-user');
+
+      function flash(message, type = 'info') {
+        if (ui && typeof ui.flash === 'function') {
+          ui.flash(message, type);
+        } else {
+          console[type === 'error' ? 'error' : 'log'](message);
+        }
+      }
+
+      function setConnection(isConnected, label) {
+        if (ui && typeof ui.setConnection === 'function') {
+          ui.setConnection(isConnected, label);
+          return;
+        }
+        const el = document.getElementById('connection-state');
+        if (!el) return;
+        el.textContent = label || (isConnected ? 'Connected' : 'Disconnected');
+      }
+
+      function setDeviceStatus(message) {
+        deviceStatus.textContent = message;
+      }
+
+      function esc(v) {
+        if (ui && typeof ui.esc === 'function') return ui.esc(v);
+        return String(v ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function fmtDate(v) {
+        if (ui && typeof ui.fmtDate === 'function') return ui.fmtDate(v);
+        if (!v) return '—';
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
+      }
+
+      function option(value, label, selected = false) {
+        const safeValue = esc(value ?? '');
+        const safeLabel = esc(label ?? '');
+        return `<option value="${safeValue}"${selected ? ' selected' : ''}>${safeLabel}</option>`;
+      }
+
+      async function resolveVenueId() {
+        if (db?.cfg?.venueId) return db.cfg.venueId;
+
+        if (auth && typeof auth.getUser === 'function') {
+          const user = await auth.getUser();
+          currentUser = user;
+        } else if (db?.client?.auth) {
+          const { data, error } = await db.client.auth.getUser();
+          if (error) throw error;
+          currentUser = data.user;
+        }
+
+        if (!currentUser) throw new Error('You must be logged in.');
+
+        const { data: profile, error: profileError } = await db.client
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        if (profile?.venue_id) return profile.venue_id;
+
+        const { data: venue, error: venueError } = await db.client
+          .from('venues')
+          .select('id')
+          .eq('owner_profile_id', currentUser.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (venueError) throw venueError;
+        if (!venue?.id) throw new Error('No venue could be resolved for this account.');
+
+        return venue.id;
+      }
+
+      async function requireAccess() {
+        if (auth && typeof auth.requireRole === 'function' && db?.cfg?.venueRoles?.length) {
+          await auth.requireRole(db.cfg.venueRoles);
+        }
+        if (auth && typeof auth.bootProtectedShell === 'function') {
+          await auth.bootProtectedShell();
+        }
+
+        if (!currentUser) {
+          if (auth && typeof auth.getUser === 'function') {
+            currentUser = await auth.getUser();
+          } else if (db?.client?.auth) {
+            const { data } = await db.client.auth.getUser();
+            currentUser = data.user;
+          }
+        }
+
+        if (currentUserEl && currentUser) {
+          currentUserEl.textContent = currentUser.email || '';
+        }
+      }
+
+      async function loadBrowserDevices() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter(d => d.kind === 'videoinput');
+        const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+        cameraSelect.innerHTML = videoInputs.length
+          ? option('', 'Select camera') + videoInputs.map((d, i) => option(d.deviceId, d.label || `Camera ${i + 1}`)).join('')
+          : option('', 'No cameras found', true);
+
+        audioSelect.innerHTML = audioInputs.length
+          ? option('', 'Select audio input') + audioInputs.map((d, i) => option(d.deviceId, d.label || `Audio Input ${i + 1}`)).join('')
+          : option('', 'No audio inputs found', true);
+
+        const saved = JSON.parse(localStorage.getItem('linkdn_device_setup') || '{}');
+        if (saved.cameraId) cameraSelect.value = saved.cameraId;
+        if (saved.audioId) audioSelect.value = saved.audioId;
+
+        setDeviceStatus('Devices loaded.');
+      }
+
+      async function loadSavedDevices() {
+        const { data, error } = await db.client
+          .from('devices')
+          .select('*')
+          .eq('venue_id', venueId)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        currentDevices = data || [];
+        renderDevices();
+        renderPreferenceOptions();
+      }
+
+      async function loadPreferences() {
+        const { data, error } = await db.client
+          .from('venue_device_preferences')
+          .select('*')
+          .eq('venue_id', venueId)
+          .maybeSingle();
+
+        if (error) throw error;
+        currentPreferences = data || null;
+        renderPreferenceOptions();
+      }
+
+      function renderPreferenceOptions() {
+        const cameras = currentDevices.filter(d => d.device_kind === 'camera');
+        const mics = currentDevices.filter(d => d.device_kind === 'microphone');
+
+        preferredCamera.innerHTML =
+          option('', 'No preferred camera', !currentPreferences?.preferred_camera_id) +
+          cameras.map(d => option(d.id, d.label || d.browser_device_id || d.id, d.id === currentPreferences?.preferred_camera_id)).join('');
+
+        preferredAudio.innerHTML =
+          option('', 'No preferred audio input', !currentPreferences?.preferred_audio_input_id) +
+          mics.map(d => option(d.id, d.label || d.browser_device_id || d.id, d.id === currentPreferences?.preferred_audio_input_id)).join('');
+      }
+
+      function renderDevices() {
+        devicesTableBody.innerHTML = currentDevices.map(device => `
+          <tr>
+            <td>${esc(device.label)}</td>
+            <td>${esc(device.device_kind)}</td>
+            <td>${esc(device.browser_device_id || '—')}</td>
+            <td>${esc(device.status || 'active')}</td>
+            <td>${fmtDate(device.updated_at)}</td>
+            <td class="actions">
+              <button type="button" data-toggle="${device.id}">
+                ${device.status === 'disabled' ? 'Enable' : 'Disable'}
+              </button>
+              <button type="button" class="danger" data-delete="${device.id}">Remove</button>
+            </td>
+          </tr>
+        `).join('') || `<tr><td colspan="6">No devices saved for this venue.</td></tr>`;
+
+        devicesTableBody.querySelectorAll('[data-toggle]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.toggle;
+            const device = currentDevices.find(d => d.id === id);
+            if (!device) return;
+
+            try {
+              const nextStatus = device.status === 'disabled' ? 'active' : 'disabled';
+              const { error } = await db.client
+                .from('devices')
+                .update({ status: nextStatus, updated_at: new Date().toISOString() })
+                .eq('id', id)
+                .eq('venue_id', venueId);
+
+              if (error) throw error;
+
+              flash(`Device ${nextStatus === 'active' ? 'enabled' : 'disabled'}.`);
+              await loadSavedDevices();
+            } catch (err) {
+              console.error(err);
+              flash(err.message || 'Could not update device status.', 'error');
+            }
+          });
+        });
+
+        devicesTableBody.querySelectorAll('[data-delete]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.delete;
+            if (!confirm('Remove this device from the venue?')) return;
+
+            try {
+              const { error } = await db.client
+                .from('devices')
+                .delete()
+                .eq('id', id)
+                .eq('venue_id', venueId);
+
+              if (error) throw error;
+
+              flash('Device removed.');
+              await loadSavedDevices();
+              await loadPreferences();
+            } catch (err) {
+              console.error(err);
+              flash(err.message || 'Could not remove device.', 'error');
+            }
+          });
+        });
+      }
+
+      async function upsertDiscoveredDevice(label, kind, browserDeviceId) {
+        if (!browserDeviceId) return null;
+
+        const payload = {
+          venue_id: venueId,
+          label: label || (kind === 'camera' ? 'Camera' : 'Microphone'),
+          device_kind: kind,
+          browser_device_id: browserDeviceId,
+          status: 'active',
+          updated_at: new Date().toISOString()
+        };
+
+        const { data, error } = await db.client
+          .from('devices')
+          .upsert(payload, { onConflict: 'venue_id,browser_device_id' })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
+
+      async function saveSelectedDevices() {
+        const cameraLabel = cameraSelect.options[cameraSelect.selectedIndex]?.text || '';
+        const audioLabel = audioSelect.options[audioSelect.selectedIndex]?.text || '';
+
+        const localConfig = {
+          cameraId: cameraSelect.value,
+          audioId: audioSelect.value,
+          cameraName: cameraLabel,
+          audioName: audioLabel
+        };
+        localStorage.setItem('linkdn_device_setup', JSON.stringify(localConfig));
+
+        let savedCamera = null;
+        let savedAudio = null;
+
+        if (cameraSelect.value) {
+          savedCamera = await upsertDiscoveredDevice(cameraLabel, 'camera', cameraSelect.value);
+        }
+
+        if (audioSelect.value) {
+          savedAudio = await upsertDiscoveredDevice(audioLabel, 'microphone', audioSelect.value);
+        }
+
+        const { error } = await db.client
+          .from('venue_device_preferences')
+          .upsert({
+            venue_id: venueId,
+            preferred_camera_id: savedCamera?.id || null,
+            preferred_audio_input_id: savedAudio?.id || null,
+            preferred_audio_interface_id: null
+          }, { onConflict: 'venue_id' });
+
+        if (error) throw error;
+      }
+
+      async function init() {
+        try {
+          setConnection(false, 'Connecting');
+          await requireAccess();
+          venueId = await resolveVenueId();
+
+          setConnection(true, 'Connected');
+
+          if (navigator.mediaDevices?.enumerateDevices) {
+            try {
+              await loadBrowserDevices();
+            } catch (err) {
+              console.warn(err);
+            }
+          }
+
+          await loadSavedDevices();
+          await loadPreferences();
+        } catch (err) {
+          console.error(err);
+          setConnection(false, 'Error');
+          flash(err.message || 'Failed to initialize venue device setup.', 'error');
+        }
+      }
+
+      document.getElementById('grantBtn').addEventListener('click', async () => {
+        try {
+          await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          await loadBrowserDevices();
+          flash('Camera and microphone access granted.');
+        } catch (err) {
+          console.error(err);
+          flash(err.message || 'Permission denied.', 'error');
+        }
+      });
+
+      document.getElementById('refreshBtn').addEventListener('click', async () => {
+        try {
+          await loadBrowserDevices();
+          flash('Browser devices refreshed.');
+        } catch (err) {
+          console.error(err);
+          flash(err.message || 'Could not refresh devices.', 'error');
+        }
+      });
+
+      document.getElementById('saveSelectedBtn').addEventListener('click', async () => {
+        try {
+          await saveSelectedDevices();
+          await loadSavedDevices();
+          await loadPreferences();
+          setDeviceStatus('Selected devices saved to venue.');
+          flash('Selected devices saved.');
+        } catch (err) {
+          console.error(err);
+          flash(err.message || 'Could not save selected devices.', 'error');
+        }
+      });
+
+      manualForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        try {
+          const payload = {
+            venue_id: venueId,
+            label: manualForm.label.value.trim(),
+            device_kind: manualForm.device_kind.value,
+            browser_device_id: manualForm.browser_device_id.value.trim() || null,
+            status: manualForm.status.value,
+            updated_at: new Date().toISOString()
+          };
+
+          const { error } = await db.client
+            .from('devices')
+            .insert(payload);
+
+          if (error) throw error;
+
+          manualForm.reset();
+          flash('Device added.');
+          await loadSavedDevices();
+        } catch (err) {
+          console.error(err);
+          flash(err.message || 'Could not add device.', 'error');
+        }
+      });
+
+      document.getElementById('manual-device-reset').addEventListener('click', () => {
+        manualForm.reset();
+      });
+
+      preferencesForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        try {
+          const { error } = await db.client
+            .from('venue_device_preferences')
+            .upsert({
+              venue_id: venueId,
+              preferred_camera_id: preferredCamera.value || null,
+              preferred_audio_input_id: preferredAudio.value || null,
+              preferred_audio_interface_id: null
+            }, { onConflict: 'venue_id' });
+
+          if (error) throw error;
+
+          flash('Venue device preferences saved.');
+          await loadPreferences();
+        } catch (err) {
+          console.error(err);
+          flash(err.message || 'Could not save venue preferences.', 'error');
+        }
+      });
+
+      document.getElementById('logout-button').addEventListener('click', async () => {
+        try {
+          if (auth && typeof auth.signOut === 'function') {
+            await auth.signOut();
+            return;
+          }
+
+          const { error } = await db.client.auth.signOut();
+          if (error) throw error;
+          window.location.href = '/login.html';
+        } catch (err) {
+          console.error(err);
+          flash(err.message || 'Logout failed.', 'error');
+        }
+      });
+
+      document.addEventListener('DOMContentLoaded', init);
+    })();
+  </script>
+</body>
+</html>

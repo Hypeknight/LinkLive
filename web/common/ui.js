@@ -63,4 +63,87 @@ window.LiveUI = window.LiveUI || {};
 
     box.textContent = message;
     box.style.display = 'block';
-    box.style.background = type === 'error' ?
+    box.style.background = type === 'error' ? '#7f1d1d' : '#1f2937';
+
+    clearTimeout(box._timer);
+    box._timer = setTimeout(() => {
+      box.style.display = 'none';
+    }, 3000);
+  }
+
+  function setConnection(isConnected, label) {
+    const el = document.querySelector('[data-connection-status], #connection-state');
+    if (!el) return;
+
+    el.textContent = label || (isConnected ? 'Connected' : 'Disconnected');
+    el.dataset.state = isConnected ? 'connected' : 'disconnected';
+    el.classList.toggle('offline', !isConnected);
+    el.classList.toggle('online', !!isConnected);
+  }
+
+  function fillShell() {}
+
+  function esc(v) {
+    return String(v ?? '').replace(/[&<>"']/g, s => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[s]));
+  }
+
+  function fmtDate(v) {
+    if (!v) return '—';
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
+  }
+
+  function roomName(rooms, id) {
+    return rooms.find(r => r.id === id)?.name || '—';
+  }
+
+  function option(value, label, selected = false) {
+    const safeValue = esc(value ?? '');
+    const safeLabel = esc(label ?? '');
+    return `<option value="${safeValue}"${selected ? ' selected' : ''}>${safeLabel}</option>`;
+  }
+
+  async function loadReferenceData() {
+    const db = window.LiveDB;
+    const venueId = db.cfg.venueId;
+
+    const [rooms, devices, schedules, notes, pulse] = await Promise.all([
+      db.client.from('rooms').select('*').eq('venue_id', venueId),
+      db.client.from('devices').select('*').eq('venue_id', venueId),
+      db.client.from('schedules').select('*').eq('venue_id', venueId),
+      db.client.from('ops_notes').select('*').eq('venue_id', venueId),
+      db.client.from('patron_pulse').select('*').eq('venue_id', venueId)
+    ]);
+
+    [rooms, devices, schedules, notes, pulse].forEach(r => {
+      if (r.error) throw r.error;
+    });
+
+    return {
+      rooms: rooms.data || [],
+      devices: devices.data || [],
+      schedules: schedules.data || [],
+      notes: notes.data || [],
+      pulse: pulse.data || []
+    };
+  }
+
+  Object.assign(window.LiveUI, {
+    flash,
+    setConnection,
+    fillShell,
+    esc,
+    fmtDate,
+    roomName,
+    option,
+    loadReferenceData
+  });
+
+  console.log('LiveUI initialized:', Object.keys(window.LiveUI));
+})();

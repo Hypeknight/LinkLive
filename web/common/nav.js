@@ -39,4 +39,4 @@ window.addEventListener('click', async (e) => {
     try { await window.LinkdNAuthLive?.signOut(); } catch {}
     location.href = '/auth/login.html';
   }
-}
+});
