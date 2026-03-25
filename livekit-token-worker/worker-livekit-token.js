@@ -1,14 +1,32 @@
 import { AccessToken } from 'livekit-server-sdk';
 
+const ALLOWED_ORIGIN = 'https://linklive.willie-gerald1.workers.dev';
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json',
+  };
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: corsHeaders(),
   });
 }
 
 export default {
   async fetch(request, env) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders(),
+      });
+    }
+
     if (request.method !== 'POST') {
       return json({ error: 'Method not allowed' }, 405);
     }
@@ -27,25 +45,23 @@ export default {
         return json({ error: 'roomName and identity are required' }, 400);
       }
 
-      const at = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
+      const token = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
         identity,
         name: participantName || identity,
         ttl: '2h',
       });
 
-      at.addGrant({
-        room: roomName,
+      token.addGrant({
         roomJoin: true,
+        room: roomName,
         canPublish,
         canSubscribe,
         canPublishData: true,
       });
 
-      const token = await at.toJwt();
-
       return json({
         serverUrl: env.LIVEKIT_URL,
-        token,
+        token: await token.toJwt(),
       });
     } catch (err) {
       return json({ error: err.message || 'Token generation failed' }, 500);
