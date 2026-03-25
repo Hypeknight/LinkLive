@@ -20,11 +20,11 @@ window.LinkdNLiveKit = (() => {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      roomName,
-      identity,
-      participantName,
-      canPublish,
-      canSubscribe,
+    roomName,
+    identity,
+    participantName,
+    canPublish,
+    canSubscribe,
     }),
   });
 
