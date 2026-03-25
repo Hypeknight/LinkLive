@@ -1111,6 +1111,7 @@ async function bootRooms() {
     memberships: [],
     messages: [],
     localStream: null,
+    checkinCode: null,
   };
 
   const MAX_VENUES_PER_ROOM = 5;
@@ -1298,6 +1299,10 @@ async function bootRooms() {
   async function refresh() {
     await Promise.all([loadRooms(), loadMemberships(), loadDevices()]);
     await Promise.all([loadSchedules(), loadPulse(), loadShowState(), loadMessages()]);
+    state.checkinCode = await ensureActiveVenueCode();
+    function activeVenueCodeValue() {
+    return state.checkinCode?.code || '----';
+    }
     renderCurrentPage();
   }
 
@@ -1348,6 +1353,60 @@ async function bootRooms() {
 
     if (error) throw error;
   }
+
+function randomVenueCode(length = 4) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < length; i += 1) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+async function ensureActiveVenueCode() {
+  if (!state.venue?.id) return null;
+
+  const nowIso = new Date().toISOString();
+
+  const { data: existing, error: existingError } = await db.client
+    .from('venue_checkin_codes')
+    .select('*')
+    .eq('venue_id', state.venue.id)
+    .eq('is_active', true)
+    .gt('expires_at', nowIso)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing) return existing;
+
+  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const code = randomVenueCode(4);
+
+  await db.client
+    .from('venue_checkin_codes')
+    .update({ is_active: false })
+    .eq('venue_id', state.venue.id)
+    .eq('is_active', true);
+
+  const { data: created, error: createError } = await db.client
+    .from('venue_checkin_codes')
+    .insert({
+      venue_id: state.venue.id,
+      room_id: state.roomMembership?.room_id || null,
+      code,
+      starts_at: nowIso,
+      expires_at: expiresAt,
+      is_active: true,
+      created_by: state.profile?.id || null
+    })
+    .select()
+    .single();
+
+  if (createError) throw createError;
+  return created;
+}
 
   async function updateMembership(payload) {
     if (!state.roomMembership) throw new Error('Join a room first.');
@@ -1635,6 +1694,10 @@ function renderDisplayInfo() {
   const pulseMetaEl = document.getElementById('display-pulse-meta');
   const voteUrlEl = document.getElementById('display-vote-url');
   const qrCanvas = document.getElementById('display-vote-qr');
+  const venueCodeEl = document.getElementById('display-venue-code');
+  if (venueCodeEl) {
+  venueCodeEl.innerHTML = `<strong>Venue Code:</strong> ${activeVenueCodeValue()}`;
+  }
 
   if (roomTitleEl) {
     roomTitleEl.textContent = state.roomMembership ? roomTitle(state.roomMembership.room_id) : 'No room selected';
@@ -1753,6 +1816,10 @@ function attachDisplayTrack(track, participant) {
   const entries = document.getElementById('venue-pulse-table');
   const qr = document.getElementById('venue-pulse-qr');
   const qrCanvas = document.getElementById('venue-pulse-qr-canvas');
+  const pulseCodeEl = document.getElementById('venue-pulse-code');
+  if (pulseCodeEl) {
+  pulseCodeEl.innerHTML = `<strong>Venue Code:</strong> ${activeVenueCodeValue()}`;
+  }
 
   if (prompt) {
     prompt.textContent = state.prompt?.prompt_text || 'No pulse prompt is currently live.';

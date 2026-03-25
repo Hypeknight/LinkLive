@@ -80,6 +80,10 @@
     state.promptId = p.get('prompt') || '';
   }
 
+function randomGuestSessionToken() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
   async function loadCore() {
     const venueRes = state.venueId
       ? await db.client.from('venues').select('*').eq('id', state.venueId).maybeSingle()
@@ -402,31 +406,70 @@ async function loadCheckinContext() {
   }
 
   submit.onclick = async () => {
-    const code = input.value.trim();
+    const code = input.value.trim().toUpperCase();
+
     if (!code) {
       status.textContent = 'Enter a code first.';
       return;
     }
 
-    if (code.length < 4) {
-      status.textContent = 'Code is invalid.';
-      return;
+    try {
+      const nowIso = new Date().toISOString();
+
+      const { data: codeRow, error: codeError } = await db.client
+        .from('venue_checkin_codes')
+        .select('*')
+        .eq('venue_id', venueId)
+        .eq('is_active', true)
+        .eq('code', code)
+        .gt('expires_at', nowIso)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (codeError) throw codeError;
+
+      if (!codeRow) {
+        status.textContent = 'Code is invalid or expired.';
+        return;
+      }
+
+      const sessionToken = randomGuestSessionToken();
+      const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+
+      const { data: sessionRow, error: sessionError } = await db.client
+        .from('guest_presence_sessions')
+        .insert({
+          venue_id: venueId,
+          room_id: roomId || null,
+          prompt_id: promptId || null,
+          session_token: sessionToken,
+          verification_method: 'venue_code',
+          verified_code_id: codeRow.id,
+          expires_at: expiresAt,
+          user_agent: navigator.userAgent || null
+        })
+        .select()
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      storePresence({
+        venueId,
+        roomId,
+        promptId,
+        expiresAt,
+        presenceSessionId: sessionRow.id,
+        sessionToken: sessionToken
+      });
+
+      status.textContent = 'Presence verified. Redirecting…';
+
+      const nextUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(roomId)}&venue=${encodeURIComponent(venueId)}${promptId ? `&prompt=${encodeURIComponent(promptId)}` : ''}`;
+      window.location.href = nextUrl;
+    } catch (err) {
+      status.textContent = err.message || 'Verification failed.';
     }
-
-    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-    storePresence({
-      venueId,
-      roomId,
-      promptId,
-      codeUsed: code,
-      expiresAt,
-      presenceSessionId: `local-${Date.now()}`
-    });
-
-    status.textContent = 'Presence verified. Redirecting…';
-
-    const nextUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(roomId)}&venue=${encodeURIComponent(venueId)}${promptId ? `&prompt=${encodeURIComponent(promptId)}` : ''}`;
-    window.location.href = nextUrl;
   };
 }
 
