@@ -1,4 +1,4 @@
-(function () {
+/*(function () {
   const db = window.LiveDB;
   const ui = window.LiveUI;
   const auth = window.LiveAuth;
@@ -555,4 +555,535 @@
   }
 
   document.addEventListener('DOMContentLoaded', boot);
+})();
+
+*/
+
+
+
+(function () {
+  const db = window.LiveDB;
+  const ui = window.LiveUI;
+  const auth = window.LiveAuth;
+  const lk = window.LinkdNLiveKit;
+
+  let cached = {
+    rooms: [],
+    devices: [],
+    schedules: [],
+    notes: [],
+    pulse: [],
+    roomVenues: [],
+    showState: [],
+    prefs: null,
+    venue: null,
+    joinedRoom: null,
+  };
+
+  function roomTitle(room) {
+    return room?.title || '—';
+  }
+
+  function currentVenueId() {
+    return cached.venue?.id || null;
+  }
+
+  function currentRoomId() {
+    return cached.joinedRoom?.room_id || null;
+  }
+
+  function livekitRoomName(roomId) {
+    return `lk_room_${roomId}`;
+  }
+
+  async function resolveVenue() {
+    const user = await auth.getUser();
+    if (!user) throw new Error('No logged-in user found.');
+
+    const { data, error } = await db.client
+      .from('venues')
+      .select('*')
+      .eq('owner_profile_id', user.id)
+      .eq('active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error('No active venue found for this account.');
+    return data;
+  }
+
+  async function loadVenueScopedData() {
+    cached.venue = await resolveVenue();
+
+    const venueId = cached.venue.id;
+
+    const [
+      roomsRes,
+      devicesRes,
+      schedulesRes,
+      pulseRes,
+      prefsRes,
+      roomVenuesRes,
+      showStateRes,
+      joinedRoomRes
+    ] = await Promise.all([
+      db.client.from('rooms').select('*').eq('is_active', true),
+      db.client.from('devices').select('*').eq('venue_id', venueId),
+      db.client.from('schedules').select('*'),
+      db.client.from('patron_pulse').select('*').eq('venue_id', String(venueId)),
+      db.client.from('venue_device_preferences').select('*').eq('venue_id', venueId).maybeSingle(),
+      db.client.from('room_venues').select('*').is('left_at', null),
+      db.client.from('show_state').select('*'),
+      db.client.from('room_venues').select('*').eq('venue_id', venueId).is('left_at', null).maybeSingle()
+    ]);
+
+    [
+      roomsRes, devicesRes, schedulesRes, pulseRes,
+      prefsRes, roomVenuesRes, showStateRes, joinedRoomRes
+    ].forEach(r => { if (r.error) throw r.error; });
+
+    cached.rooms = roomsRes.data || [];
+    cached.devices = devicesRes.data || [];
+    cached.schedules = schedulesRes.data || [];
+    cached.pulse = pulseRes.data || [];
+    cached.prefs = prefsRes.data || null;
+    cached.roomVenues = roomVenuesRes.data || [];
+    cached.showState = showStateRes.data || [];
+    cached.joinedRoom = joinedRoomRes.data || null;
+  }
+
+  async function refresh() {
+    await loadVenueScopedData();
+    const page = document.body.dataset.page;
+
+    if (page === 'venue-rooms') renderRooms();
+    if (page === 'venue-production') renderProduction();
+    if (page === 'venue-display') renderDisplayState();
+    if (page === 'venue-pulse') renderPulse();
+    if (page === 'venue-local-controls') renderLocalControlsState();
+  }
+
+  async function boot() {
+    await auth.requireRole(db.cfg.venueRoles);
+    await auth.bootProtectedShell();
+    ui.setConnection(true, 'Connected');
+    await refresh();
+
+    const page = document.body.dataset.page;
+    const boots = {
+      'venue-rooms': bootRooms,
+      'venue-production': bootProduction,
+      'venue-display': bootDisplay,
+      'venue-pulse': bootPulse,
+      'venue-local-controls': bootLocalControls
+    };
+
+    if (boots[page]) await boots[page]();
+
+    ['rooms','devices','schedules','patron_pulse','room_venues','show_state','venue_device_preferences']
+      .forEach(table => db.subscribe(table, refresh));
+  }
+
+  function joinedVenueCount(roomId) {
+    return cached.roomVenues.filter(rv => rv.room_id === roomId && !rv.left_at).length;
+  }
+
+  function renderRooms() {
+    const table = document.getElementById('venue-rooms-table');
+    if (!table) return;
+
+    table.innerHTML = cached.rooms.map(room => {
+      const count = joinedVenueCount(room.id);
+      const isJoined = cached.joinedRoom?.room_id === room.id;
+      const isFull = count >= 5 && !isJoined;
+
+      return `<tr>
+        <td>${ui.esc(room.title)}</td>
+        <td>${ui.esc(room.zone || '—')}</td>
+        <td>${ui.esc(room.status || 'scheduled')}</td>
+        <td>${ui.esc(count)}/5</td>
+        <td class="actions">
+          ${isJoined
+            ? `<button data-leave="${room.id}" class="secondary">Leave Room</button>`
+            : `<button data-join="${room.id}" ${isFull ? 'disabled' : ''}>${isFull ? 'Full' : 'Join Room'}</button>`}
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="5">No rooms available.</td></tr>`;
+
+    table.querySelectorAll('[data-join]').forEach(btn => btn.onclick = async () => {
+      try {
+        if (cached.joinedRoom) {
+          ui.flash('Leave your current room before joining a new one.', 'error');
+          return;
+        }
+
+        const roomId = btn.dataset.join;
+        const count = joinedVenueCount(roomId);
+        if (count >= 5) {
+          ui.flash('This room is already full.', 'error');
+          return;
+        }
+
+        const { error } = await db.client.from('room_venues').insert({
+          room_id: roomId,
+          venue_id: currentVenueId(),
+          status: 'connected',
+          is_broadcasting: false
+        });
+
+        if (error) throw error;
+        ui.flash('Joined room.');
+        await refresh();
+      } catch (err) {
+        ui.flash(err.message || 'Could not join room.', 'error');
+      }
+    });
+
+    table.querySelectorAll('[data-leave]').forEach(btn => btn.onclick = async () => {
+      try {
+        const { error } = await db.client
+          .from('room_venues')
+          .update({ left_at: new Date().toISOString(), status: 'disconnected', is_broadcasting: false })
+          .eq('venue_id', currentVenueId())
+          .is('left_at', null);
+
+        if (error) throw error;
+
+        await lk.disconnect();
+        ui.flash('Left room.');
+        await refresh();
+      } catch (err) {
+        ui.flash(err.message || 'Could not leave room.', 'error');
+      }
+    });
+  }
+
+  function renderProduction() {
+    const roomNameEl = document.getElementById('production-room-name');
+    const statusEl = document.getElementById('production-feed-status');
+    const connectedVenuesEl = document.getElementById('production-connected-venues');
+    const scheduleEl = document.getElementById('production-schedule-body');
+
+    if (roomNameEl) {
+      const room = cached.rooms.find(r => r.id === currentRoomId());
+      roomNameEl.textContent = room ? roomTitle(room) : 'No room joined';
+    }
+
+    if (statusEl) {
+      statusEl.textContent = cached.joinedRoom?.is_broadcasting ? 'Live' : 'Stopped';
+    }
+
+    if (connectedVenuesEl) {
+      const roomId = currentRoomId();
+      const venueIds = cached.roomVenues
+        .filter(rv => rv.room_id === roomId && !rv.left_at)
+        .map(rv => rv.venue_id);
+
+      connectedVenuesEl.innerHTML = venueIds.length
+        ? venueIds.map(id => `<li>${ui.esc(String(id))}</li>`).join('')
+        : `<li>No connected venues.</li>`;
+    }
+
+    if (scheduleEl) {
+      const roomId = currentRoomId();
+      scheduleEl.innerHTML = cached.schedules
+        .filter(s => s.room_id === roomId)
+        .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
+        .map(s => `<tr>
+          <td>${ui.esc(s.segment_title)}</td>
+          <td>${ui.fmtDate(s.starts_at)}</td>
+          <td>${ui.fmtDate(s.end_at)}</td>
+          <td>${ui.esc(s.segment_type || '—')}</td>
+        </tr>`)
+        .join('') || `<tr><td colspan="4">No schedule found for this room.</td></tr>`;
+    }
+  }
+
+  async function bootProduction() {
+    const preview = document.getElementById('production-preview');
+    const startBtn = document.getElementById('start-feed');
+    const stopBtn = document.getElementById('stop-feed');
+
+    if (!startBtn || !stopBtn) return;
+
+    startBtn.onclick = async () => {
+      try {
+        if (!currentRoomId()) throw new Error('Join a room first.');
+
+        const cameraId = cached.prefs?.preferred_camera_id
+          ? cached.devices.find(d => d.id === cached.prefs.preferred_camera_id)?.input_id
+          : null;
+
+        const micId = cached.prefs?.preferred_audio_input_id
+          ? cached.devices.find(d => d.id === cached.prefs.preferred_audio_input_id)?.input_id
+          : null;
+
+        await lk.connect({
+          roomName: livekitRoomName(currentRoomId()),
+          identity: `venue_${currentVenueId()}`,
+          participantName: cached.venue?.name || `Venue ${currentVenueId()}`,
+          canPublish: true,
+          canSubscribe: true
+        });
+
+        await lk.createAndPublishLocalTracks({
+          videoDeviceId: cameraId,
+          audioDeviceId: micId
+        });
+
+        if (preview) lk.attachLocalPreview(preview);
+
+        const { error } = await db.client
+          .from('room_venues')
+          .update({ is_broadcasting: true, status: 'connected' })
+          .eq('venue_id', currentVenueId())
+          .is('left_at', null);
+
+        if (error) throw error;
+
+        ui.flash('Feed started.');
+        await refresh();
+      } catch (err) {
+        ui.flash(err.message || 'Could not start feed.', 'error');
+      }
+    };
+
+    stopBtn.onclick = async () => {
+      try {
+        await lk.disconnect();
+
+        const { error } = await db.client
+          .from('room_venues')
+          .update({ is_broadcasting: false })
+          .eq('venue_id', currentVenueId())
+          .is('left_at', null);
+
+        if (error) throw error;
+
+        ui.flash('Feed stopped.');
+        await refresh();
+      } catch (err) {
+        ui.flash(err.message || 'Could not stop feed.', 'error');
+      }
+    };
+
+    renderProduction();
+  }
+
+  function renderDisplayState() {
+    const roomTitleEl = document.getElementById('display-room-title');
+    if (!roomTitleEl) return;
+
+    const room = cached.rooms.find(r => r.id === currentRoomId());
+    roomTitleEl.textContent = room ? roomTitle(room) : 'No room joined';
+  }
+
+  async function bootDisplay() {
+    const host = document.getElementById('display-video-host');
+    if (!host) return;
+
+    if (!currentRoomId()) {
+      host.innerHTML = `<div class="wall-empty">No room joined.</div>`;
+      return;
+    }
+
+    await lk.connect({
+      roomName: livekitRoomName(currentRoomId()),
+      identity: `display_${currentVenueId()}`,
+      participantName: `Display ${currentVenueId()}`,
+      canPublish: false,
+      canSubscribe: true
+    });
+
+    function attachTrack(track, participant) {
+      if (track.kind !== 'video') return;
+
+      const existing = host.querySelector(`[data-participant="${participant.identity}"]`);
+      if (existing) return;
+
+      const card = document.createElement('div');
+      card.className = 'display-feed-card';
+      card.dataset.participant = participant.identity;
+
+      const title = document.createElement('h3');
+      title.textContent = participant.name || participant.identity;
+
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = false;
+
+      track.attach(video);
+
+      card.appendChild(title);
+      card.appendChild(video);
+      host.appendChild(card);
+    }
+
+    lk.onTrackSubscribed(({ track, participant }) => {
+      attachTrack(track, participant);
+    });
+
+    const room = lk.getRoom();
+    room.remoteParticipants.forEach((participant) => {
+      participant.trackPublications.forEach((pub) => {
+        if (pub.track) attachTrack(pub.track, participant);
+      });
+    });
+
+    renderDisplayState();
+  }
+
+  function renderPulse() {
+    const table = document.getElementById('venue-pulse-table');
+    if (!table) return;
+
+    table.innerHTML = cached.pulse.map(p => `<tr>
+      <td>${ui.esc(roomTitle(cached.rooms.find(r => r.id === p.room_id)))}</td>
+      <td>${ui.esc(p.pulse_score)}</td>
+      <td>${ui.esc(p.crowd_count)}</td>
+      <td>${ui.esc(p.energy_level)}</td>
+      <td>${ui.esc(p.source)}</td>
+      <td>${ui.fmtDate(p.created_at)}</td>
+    </tr>`).join('') || `<tr><td colspan="6">No pulse entries found.</td></tr>`;
+  }
+
+  async function bootPulse() {
+    renderPulse();
+  }
+
+  function renderLocalControlsState() {
+    const roomText = document.getElementById('local-current-room');
+    if (!roomText) return;
+    const room = cached.rooms.find(r => r.id === currentRoomId());
+    roomText.textContent = room ? roomTitle(room) : 'No room joined';
+  }
+
+  async function bootLocalControls() {
+    const camSel = document.getElementById('local-camera-device');
+    const micSel = document.getElementById('local-mic-device');
+    const preview = document.getElementById('local-video');
+    const info = document.getElementById('stream-info');
+    const saveBtn = document.getElementById('save-local-devices');
+    const requestBtn = document.getElementById('request-media');
+    const startPreviewBtn = document.getElementById('start-preview');
+    const stopPreviewBtn = document.getElementById('stop-preview');
+
+    if (!camSel || !micSel) return;
+
+    async function loadDevices() {
+      const { videoInputs, audioInputs } = await lk.listDevices();
+
+      camSel.innerHTML = videoInputs.map((d, i) => ui.option(d.deviceId, d.label || `Camera ${i + 1}`)).join('');
+      micSel.innerHTML = audioInputs.map((d, i) => ui.option(d.deviceId, d.label || `Microphone ${i + 1}`)).join('');
+    }
+
+    requestBtn && (requestBtn.onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        stream.getTracks().forEach(t => t.stop());
+        await loadDevices();
+        ui.flash('Camera and microphone access granted');
+      } catch (err) {
+        ui.flash(err.message || 'Permission denied', 'error');
+      }
+    });
+
+    startPreviewBtn && (startPreviewBtn.onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: camSel.value ? { deviceId: { exact: camSel.value } } : true,
+          audio: micSel.value ? { deviceId: { exact: micSel.value } } : true
+        });
+
+        preview.srcObject = stream;
+        info.textContent = 'Preview active.';
+      } catch (err) {
+        ui.flash(err.message || 'Preview failed', 'error');
+      }
+    });
+
+    stopPreviewBtn && (stopPreviewBtn.onclick = () => {
+      const stream = preview.srcObject;
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      preview.srcObject = null;
+      info.textContent = 'Preview stopped.';
+    });
+
+    saveBtn && (saveBtn.onclick = async () => {
+      try {
+        const cameraName = camSel.options[camSel.selectedIndex]?.text || 'Camera';
+        const micName = micSel.options[micSel.selectedIndex]?.text || 'Microphone';
+
+        let savedCamera = null;
+        let savedMic = null;
+
+        if (camSel.value) {
+          const { data, error } = await db.client
+            .from('devices')
+            .upsert({
+              venue_id: String(currentVenueId()),
+              room_id: currentRoomId(),
+              name: cameraName,
+              type: 'camera',
+              input_id: camSel.value,
+              status: 'online',
+              is_default: false
+            }, { onConflict: 'venue_id,input_id' })
+            .select()
+            .single();
+
+          if (error) throw error;
+          savedCamera = data;
+        }
+
+        if (micSel.value) {
+          const { data, error } = await db.client
+            .from('devices')
+            .upsert({
+              venue_id: String(currentVenueId()),
+              room_id: currentRoomId(),
+              name: micName,
+              type: 'microphone',
+              input_id: micSel.value,
+              status: 'online',
+              is_default: false
+            }, { onConflict: 'venue_id,input_id' })
+            .select()
+            .single();
+
+          if (error) throw error;
+          savedMic = data;
+        }
+
+        const { error: prefError } = await db.client
+          .from('venue_device_preferences')
+          .upsert({
+            venue_id: currentVenueId(),
+            preferred_camera_id: savedCamera?.id || null,
+            preferred_audio_input_id: savedMic?.id || null,
+            preferred_audio_interface_id: null,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'venue_id' });
+
+        if (prefError) throw prefError;
+
+        ui.flash('Local devices saved.');
+        await refresh();
+      } catch (err) {
+        ui.flash(err.message || 'Could not save local devices.', 'error');
+      }
+    });
+
+    await loadDevices();
+    renderLocalControlsState();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    boot().catch(err => {
+      console.error(err);
+      ui.flash(err.message || 'Venue page failed to load', 'error');
+    });
+  });
 })();

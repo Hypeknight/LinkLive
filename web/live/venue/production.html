@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/common/app.css" />
   <script src="/common/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/livekit.js"></script>
   <script src="/common/supabase.js"></script>
   <script src="/common/db.js"></script>
   <script src="/common/ui.js"></script>
@@ -42,6 +43,15 @@
             <button type="button" class="secondary" id="stop-feed-btn">Stop Feed</button>
           </div>
         </article>
+        <video id="production-preview" autoplay muted playsinline></video>
+          <button id="start-feed" type="button">Start Feed</button>
+          <button id="stop-feed" type="button">Stop Feed</button>
+          <div id="production-room-name"></div>
+          <div id="production-feed-status"></div>
+          <ul id="production-connected-venues"></ul>
+          <table>
+            <tbody id="production-schedule-body"></tbody>
+          </table>
         <article class="card"><h3>Current Pulse</h3><div id="production-pulse-card"></div></article>
         <article class="card">
           <h3>Room Messages</h3>

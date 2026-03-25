@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/common/app.css" />
   <script src="/common/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/livekit.js"></script>
   <script src="/common/supabase.js"></script>
   <script src="/common/db.js"></script>
   <script src="/common/ui.js"></script>
@@ -29,6 +30,8 @@
     <main class="main">
       <header class="header"><div><h1>Venue Display</h1><p>Feed for the in-club monitor. Two venues defaults to the opposite venue; more than two uses room display mode.</p></div><div class="header-right"><div id="connection-state" class="connection offline" data-connection-status>Offline</div><span id="display-mode">auto</span></div></header>
       <section class="card"><h2 id="display-room-title">No room selected</h2><div id="display-layout" class="grid cols-2"></div></section>
+    <div id="display-room-title"></div>
+    <div id="display-video-host"></div>
     </main>
   </div>
 </body>

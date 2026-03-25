@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/common/app.css" />
   <script src="/common/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/livekit.js"></script>
   <script src="/common/supabase.js"></script>
   <script src="/common/db.js"></script>
   <script src="/common/ui.js"></script>
@@ -47,6 +48,15 @@
         </article>
       </section>
       <article class="card"><h3>Saved Venue Devices</h3><table><thead><tr><th>Name</th><th>Type</th><th>Input</th><th>Status</th><th>Default</th><th>Actions</th></tr></thead><tbody id="local-devices-table"></tbody></table></article>
+      <div id="local-current-room"></div>
+      <button id="request-media" type="button">Grant Camera + Mic</button>
+      <button id="start-preview" type="button">Start Preview</button>
+      <button id="stop-preview" type="button">Stop Preview</button>
+      <button id="save-local-devices" type="button">Save Devices</button>
+      <select id="local-camera-device"></select>
+      <select id="local-mic-device"></select>
+      <video id="local-video" autoplay muted playsinline></video>
+      <div id="stream-info"></div>
     </main>
   </div>
 </body>
