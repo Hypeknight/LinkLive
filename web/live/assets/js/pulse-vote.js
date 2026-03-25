@@ -423,7 +423,7 @@ async function loadCheckinContext() {
     bindDjRequestSubmit();
   }
 
-  async function bootCheckinPage() {
+async function bootCheckinPage() {
   const submit = document.getElementById('pc-submit');
   const input = document.getElementById('pc-code');
   const status = document.getElementById('pc-status');
@@ -450,15 +450,24 @@ async function loadCheckinContext() {
   submit.onclick = async () => {
     const code = input.value.trim().toUpperCase();
 
+    if (!venueId) {
+      status.textContent = 'Missing venue in QR/check-in link.';
+      return;
+    }
+
     if (!code) {
       status.textContent = 'Enter a code first.';
       return;
     }
 
+    submit.disabled = true;
+
     try {
       const nowIso = new Date().toISOString();
 
-      const { data: codeRow, error: codeError } = await db.client
+      status.textContent = 'Checking code…';
+
+      const { data: codeRows, error: codeError } = await db.client
         .from('venue_checkin_codes')
         .select('*')
         .eq('venue_id', venueId)
@@ -466,35 +475,53 @@ async function loadCheckinContext() {
         .eq('code', code)
         .gt('expires_at', nowIso)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(5);
 
-      if (codeError) throw codeError;
+      if (codeError) {
+        console.error('venue_checkin_codes lookup error:', codeError);
+        throw new Error(`Code lookup failed: ${codeError.message}`);
+      }
 
-      if (!codeRow) {
-        status.textContent = 'Code is invalid or expired.';
+      if (!codeRows || !codeRows.length) {
+        console.warn('No matching active code found.', {
+          venueId,
+          roomId,
+          promptId,
+          code,
+          nowIso
+        });
+        status.textContent = 'Code is invalid, expired, or for a different venue.';
         return;
       }
+
+      const codeRow = codeRows[0];
+
+      status.textContent = 'Code valid. Creating guest session…';
 
       const sessionToken = randomGuestSessionToken();
       const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 
+      const insertPayload = {
+        venue_id: venueId,
+        room_id: roomId || null,
+        prompt_id: promptId || null,
+        session_token: sessionToken,
+        verification_method: 'venue_code',
+        verified_code_id: codeRow.id,
+        expires_at: expiresAt,
+        user_agent: navigator.userAgent || null
+      };
+
       const { data: sessionRow, error: sessionError } = await db.client
         .from('guest_presence_sessions')
-        .insert({
-          venue_id: venueId,
-          room_id: roomId || null,
-          prompt_id: promptId || null,
-          session_token: sessionToken,
-          verification_method: 'venue_code',
-          verified_code_id: codeRow.id,
-          expires_at: expiresAt,
-          user_agent: navigator.userAgent || null
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        console.error('guest_presence_sessions insert error:', sessionError, insertPayload);
+        throw new Error(`Session creation failed: ${sessionError.message}`);
+      }
 
       storePresence({
         venueId,
@@ -502,7 +529,7 @@ async function loadCheckinContext() {
         promptId,
         expiresAt,
         presenceSessionId: sessionRow.id,
-        sessionToken: sessionToken
+        sessionToken
       });
 
       status.textContent = 'Presence verified. Redirecting…';
@@ -510,7 +537,10 @@ async function loadCheckinContext() {
       const nextUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(roomId)}&venue=${encodeURIComponent(venueId)}${promptId ? `&prompt=${encodeURIComponent(promptId)}` : ''}`;
       window.location.href = nextUrl;
     } catch (err) {
+      console.error('Check-in verification failed:', err);
       status.textContent = err.message || 'Verification failed.';
+    } finally {
+      submit.disabled = false;
     }
   };
 }
