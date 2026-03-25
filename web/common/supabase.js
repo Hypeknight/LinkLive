@@ -23,5 +23,4 @@
     }
   };
 
-  console.log("LinkdNSupabase initialized");
-})();
+  console.log("LinkdNSupabase 
