@@ -177,6 +177,30 @@
     state.timerHandle = setInterval(tick, 1000);
   }
 
+async function loadCheckinContext() {
+  const params = qs();
+  const roomId = params.get('room') || '';
+  const venueId = params.get('venue') || '';
+
+  let venue = null;
+  let room = null;
+
+  if (venueId) {
+    const venueRes = await db.client.from('venues').select('*').eq('id', venueId).maybeSingle();
+    if (venueRes.error) throw venueRes.error;
+    venue = venueRes.data || null;
+  }
+
+  if (roomId) {
+    const roomRes = await db.client.from('rooms').select('*').eq('id', roomId).maybeSingle();
+    if (roomRes.error) throw roomRes.error;
+    room = roomRes.data || null;
+  }
+
+  return { venue, room };
+}
+
+
   function renderVoteActions() {
     const host = document.getElementById('pv-vote-actions');
     const status = document.getElementById('pv-vote-status');
@@ -353,47 +377,58 @@
     bindDjRequestSubmit();
   }
 
-  function bootCheckinPage() {
-    const submit = document.getElementById('pc-submit');
-    const input = document.getElementById('pc-code');
-    const status = document.getElementById('pc-status');
-    if (!submit || !input || !status) return;
+  async function bootCheckinPage() {
+  const submit = document.getElementById('pc-submit');
+  const input = document.getElementById('pc-code');
+  const status = document.getElementById('pc-status');
+  if (!submit || !input || !status) return;
 
-    const params = qs();
-    const roomId = params.get('room') || '';
-    const venueId = params.get('venue') || '';
-    const promptId = params.get('prompt') || '';
+  const params = qs();
+  const roomId = params.get('room') || '';
+  const venueId = params.get('venue') || '';
+  const promptId = params.get('prompt') || '';
 
-    submit.onclick = async () => {
-      const code = input.value.trim();
-      if (!code) {
-        status.textContent = 'Enter a code first.';
-        return;
-      }
-
-      // Placeholder verification logic.
-      // Replace this with backend token/code validation.
-      if (code.length < 4) {
-        status.textContent = 'Code is invalid.';
-        return;
-      }
-
-      const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-      storePresence({
-        venueId,
-        roomId,
-        promptId,
-        codeUsed: code,
-        expiresAt,
-        presenceSessionId: `local-${Date.now()}`
-      });
-
-      status.textContent = 'Presence verified. Redirecting…';
-
-      const nextUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(roomId)}&venue=${encodeURIComponent(venueId)}${promptId ? `&prompt=${encodeURIComponent(promptId)}` : ''}`;
-      window.location.href = nextUrl;
-    };
+  try {
+    const ctx = await loadCheckinContext();
+    if (ctx.venue || ctx.room) {
+      status.innerHTML = `
+        <div><strong>Venue:</strong> ${esc(ctx.venue?.name || 'Unknown')}</div>
+        <div><strong>Room:</strong> ${esc(ctx.room?.title || 'Unknown')}</div>
+        <div style="margin-top:8px;">Enter the venue code shown on screen.</div>
+      `;
+    }
+  } catch (err) {
+    status.textContent = err.message || 'Unable to load venue details.';
   }
+
+  submit.onclick = async () => {
+    const code = input.value.trim();
+    if (!code) {
+      status.textContent = 'Enter a code first.';
+      return;
+    }
+
+    if (code.length < 4) {
+      status.textContent = 'Code is invalid.';
+      return;
+    }
+
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    storePresence({
+      venueId,
+      roomId,
+      promptId,
+      codeUsed: code,
+      expiresAt,
+      presenceSessionId: `local-${Date.now()}`
+    });
+
+    status.textContent = 'Presence verified. Redirecting…';
+
+    const nextUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(roomId)}&venue=${encodeURIComponent(venueId)}${promptId ? `&prompt=${encodeURIComponent(promptId)}` : ''}`;
+    window.location.href = nextUrl;
+  };
+}
 
   document.addEventListener('DOMContentLoaded', async () => {
     try {
