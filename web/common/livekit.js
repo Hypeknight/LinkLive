@@ -20,11 +20,11 @@ window.LinkdNLiveKit = (() => {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-    roomName,
-    identity,
-    participantName,
-    canPublish,
-    canSubscribe,
+      roomName,
+      identity,
+      participantName,
+      canPublish,
+      canSubscribe,
     }),
   });
 
@@ -33,12 +33,12 @@ window.LinkdNLiveKit = (() => {
 
   try {
     data = raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    throw new Error(`LiveKit token endpoint returned non-JSON response (status ${res.status}).`);
+  } catch (_) {
+    throw new Error(`LiveKit token endpoint returned non-JSON response (status ${res.status}): ${raw.slice(0, 300)}`);
   }
 
   if (!res.ok) {
-    throw new Error(data?.error || `Failed to fetch LiveKit token (status ${res.status}).`);
+    throw new Error(data?.error || `LiveKit token endpoint failed with status ${res.status}`);
   }
 
   if (!data?.serverUrl || !data?.token) {
@@ -46,7 +46,7 @@ window.LinkdNLiveKit = (() => {
   }
 
   return data;
-  }
+}
 
   async function connect({ roomName, identity, participantName, canPublish = false, canSubscribe = true }) {
     const sdk = requireSDK();

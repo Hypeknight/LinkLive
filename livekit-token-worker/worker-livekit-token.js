@@ -32,6 +32,10 @@ export default {
     }
 
     try {
+      if (!env.LIVEKIT_URL) return json({ error: 'LIVEKIT_URL secret is missing' }, 500);
+      if (!env.LIVEKIT_API_KEY) return json({ error: 'LIVEKIT_API_KEY secret is missing' }, 500);
+      if (!env.LIVEKIT_API_SECRET) return json({ error: 'LIVEKIT_API_SECRET secret is missing' }, 500);
+
       const body = await request.json();
       const {
         roomName,
@@ -45,11 +49,15 @@ export default {
         return json({ error: 'roomName and identity are required' }, 400);
       }
 
-      const token = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
-        identity,
-        name: participantName || identity,
-        ttl: '2h',
-      });
+      const token = new AccessToken(
+        env.LIVEKIT_API_KEY,
+        env.LIVEKIT_API_SECRET,
+        {
+          identity,
+          name: participantName || identity,
+          ttl: '2h',
+        }
+      );
 
       token.addGrant({
         roomJoin: true,
@@ -59,12 +67,17 @@ export default {
         canPublishData: true,
       });
 
+      const jwt = await token.toJwt();
+
       return json({
         serverUrl: env.LIVEKIT_URL,
-        token: await token.toJwt(),
+        token: jwt,
       });
     } catch (err) {
-      return json({ error: err.message || 'Token generation failed' }, 500);
+      return json({
+        error: err?.message || 'Token generation failed',
+        stack: err?.stack || null,
+      }, 500);
     }
   },
 };
