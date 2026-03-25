@@ -1,4 +1,4 @@
-(function () {
+/*(function () {
   const db = window.LiveDB;
   const ui = window.LiveUI;
   const auth = window.LiveAuth;
@@ -557,7 +557,7 @@
   document.addEventListener('DOMContentLoaded', boot);
 })();
 
-
+*/
 
 
 
@@ -758,6 +758,10 @@
       }
     });
   }
+
+async function bootRooms() {
+  renderRooms();
+}
 
   function renderProduction() {
     const roomNameEl = document.getElementById('production-room-name');
