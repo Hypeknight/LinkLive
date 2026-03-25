@@ -1114,7 +1114,8 @@ async function bootRooms() {
   };
 
   const MAX_VENUES_PER_ROOM = 5;
-
+  let displayTimerHandle = null;
+  
   function esc(v) {
     return ui?.esc ? ui.esc(v) : String(v ?? '');
   }
@@ -1511,44 +1512,230 @@ async function bootRooms() {
     }
   }
 
-  function renderDisplay() {
-    const layout = document.getElementById('display-layout');
-    const title = document.getElementById('display-room-title');
-    const mode = document.getElementById('display-mode');
 
-    if (title) title.textContent = state.roomMembership ? roomTitle(state.roomMembership.room_id) : 'No room selected';
-    if (mode) mode.textContent = state.showState?.event_type || 'auto';
+  function displayParticipantIdentity(venueId) {
+  return `venue_${venueId}`;
+}
 
-    const host = document.getElementById('display-video-host');
-    if (host) return;
+function displayVoteUrl() {
+  const roomId = state.roomMembership?.room_id || '';
+  const venueId = state.venue?.id || '';
+  const promptId = state.prompt?.id || '';
+  const qs = new URLSearchParams({
+    room: roomId,
+    venue: venueId,
+  });
+  if (promptId) qs.set('prompt', promptId);
+  return `${location.origin}/venue/pulse-vote.html?${qs.toString()}`;
+}
 
-    if (!layout) return;
-
-    const members = connectedVenuesInRoom();
-    const others = members.filter(v => v.venue_id !== state.venue.id);
-    const activeMode = state.showState?.event_type || 'auto';
-
-    if (mode) mode.textContent = activeMode;
-
-    if (!state.roomMembership) {
-      layout.innerHTML = '<div class="wall-empty">Join a room to use the display.</div>';
-      return;
-    }
-
-    if (others.length === 1) {
-      layout.innerHTML = `<article class="wall-card featured"><h2>Opposite Venue</h2><p>${esc(others[0].venue_id)}</p><p>Status: ${esc(others[0].status || 'connected')}</p></article>`;
-      return;
-    }
-
-    if (others.length > 1) {
-      layout.innerHTML = others.map(v =>
-        `<article class="wall-card"><h2>${esc(v.venue_id)}</h2><p>${v.is_broadcasting ? 'Live Feed' : 'Idle Feed'}</p><p>Status: ${esc(v.status || 'connected')}</p></article>`
-      ).join('');
-      return;
-    }
-
-    layout.innerHTML = '<div class="wall-empty">No other venues are connected in this room yet.</div>';
+function clearDisplayTimer() {
+  if (displayTimerHandle) {
+    clearInterval(displayTimerHandle);
+    displayTimerHandle = null;
   }
+}
+
+function formatSeconds(total) {
+  const safe = Math.max(0, Number(total || 0));
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function startDisplayTimer() {
+  clearDisplayTimer();
+
+  const timerEl = document.getElementById('display-pulse-timer');
+  if (!timerEl) return;
+
+  if (state.prompt?.ends_at) {
+    const tick = () => {
+      const remaining = Math.max(
+        0,
+        Math.floor((new Date(state.prompt.ends_at).getTime() - Date.now()) / 1000)
+      );
+      timerEl.textContent = formatSeconds(remaining);
+      if (remaining <= 0) clearDisplayTimer();
+    };
+    tick();
+    displayTimerHandle = setInterval(tick, 1000);
+    return;
+  }
+
+  if (state.showState?.timer_running && Number.isFinite(Number(state.showState?.remaining_seconds))) {
+    let remaining = Number(state.showState.remaining_seconds);
+    timerEl.textContent = formatSeconds(remaining);
+    displayTimerHandle = setInterval(() => {
+      remaining = Math.max(0, remaining - 1);
+      timerEl.textContent = formatSeconds(remaining);
+      if (remaining <= 0) clearDisplayTimer();
+    }, 1000);
+    return;
+  }
+
+  timerEl.textContent = '—';
+}
+
+function buildDisplayPlaceholder(identity, labelText) {
+  const wrap = document.createElement('div');
+  wrap.className = 'display-feed-box';
+  wrap.dataset.participant = identity;
+
+  const label = document.createElement('div');
+  label.className = 'display-feed-label';
+  label.textContent = labelText;
+
+  const placeholder = document.createElement('div');
+  placeholder.className = 'display-placeholder';
+  placeholder.textContent = 'Waiting for live feed…';
+
+  wrap.appendChild(label);
+  wrap.appendChild(placeholder);
+  return wrap;
+}
+
+function ensureDisplayPlaceholders() {
+  const othersGrid = document.getElementById('display-others-grid');
+  const usHost = document.getElementById('display-us-feed');
+  if (!othersGrid || !usHost) return;
+
+  const roomMembers = connectedVenuesInRoom();
+  const usIdentity = displayParticipantIdentity(state.venue.id);
+  const otherMembers = roomMembers.filter(v => v.venue_id !== state.venue.id).slice(0, 4);
+
+  if (!usHost.querySelector(`[data-participant="${usIdentity}"]`)) {
+    usHost.innerHTML = '';
+    usHost.appendChild(buildDisplayPlaceholder(usIdentity, 'US'));
+  }
+
+  othersGrid.innerHTML = '';
+  otherMembers.forEach((member, index) => {
+    const identity = displayParticipantIdentity(member.venue_id);
+    const card = buildDisplayPlaceholder(identity, `Venue ${index + 1}`);
+    othersGrid.appendChild(card);
+  });
+
+  othersGrid.dataset.count = String(Math.max(otherMembers.length, 1));
+
+  if (!otherMembers.length) {
+    const empty = document.createElement('div');
+    empty.className = 'display-feed-box';
+    empty.innerHTML = `<div class="display-placeholder">No other venues are connected in this room yet.</div>`;
+    othersGrid.appendChild(empty);
+  }
+}
+
+function renderDisplayInfo() {
+  const roomTitleEl = document.getElementById('display-room-title');
+  const modeEl = document.getElementById('display-mode');
+  const phaseNameEl = document.getElementById('display-phase-name');
+  const phaseSubEl = document.getElementById('display-phase-subtitle');
+  const pulsePromptEl = document.getElementById('display-pulse-prompt');
+  const pulseMetaEl = document.getElementById('display-pulse-meta');
+  const voteUrlEl = document.getElementById('display-vote-url');
+  const qrCanvas = document.getElementById('display-vote-qr');
+
+  if (roomTitleEl) {
+    roomTitleEl.textContent = state.roomMembership ? roomTitle(state.roomMembership.room_id) : 'No room selected';
+  }
+
+  if (modeEl) {
+    modeEl.textContent = state.showState?.event_type || 'auto';
+  }
+
+  const phaseName =
+    state.showState?.event_type ||
+    state.showState?.current_segment ||
+    state.schedules[0]?.segment_title ||
+    'Waiting…';
+
+  const phaseSub =
+    state.showState?.current_round
+      ? `Current round: ${state.showState.current_round}`
+      : (state.schedules[0]?.segment_type || 'No active phase');
+
+  if (phaseNameEl) phaseNameEl.textContent = phaseName;
+  if (phaseSubEl) phaseSubEl.textContent = phaseSub;
+
+  if (pulsePromptEl) {
+    pulsePromptEl.textContent = state.prompt?.prompt_text || 'No live pulse prompt.';
+  }
+
+  if (pulseMetaEl) {
+    const type = state.prompt?.prompt_type || 'No active vote';
+    const status = state.prompt?.status || 'idle';
+    pulseMetaEl.textContent = `${type} • ${status}`;
+  }
+
+  const voteUrl = displayVoteUrl();
+  if (voteUrlEl) {
+    voteUrlEl.textContent = voteUrl;
+  }
+
+  if (qrCanvas && window.QRious) {
+    new window.QRious({
+      element: qrCanvas,
+      value: voteUrl,
+      size: 180,
+      level: 'H'
+    });
+  }
+
+  startDisplayTimer();
+  ensureDisplayPlaceholders();
+}
+
+function attachDisplayTrack(track, participant) {
+  const usIdentity = displayParticipantIdentity(state.venue.id);
+  const isUs = participant.identity === usIdentity;
+
+  const host = isUs
+    ? document.getElementById('display-us-feed')
+    : document.querySelector(`[data-participant="${participant.identity}"]`);
+
+  if (!host) return;
+
+  const existingVideo = host.querySelector('video');
+  const existingAudio = host.querySelector('audio');
+
+  if (track.kind === 'video') {
+    if (existingVideo) return;
+
+    host.innerHTML = '';
+
+    const label = document.createElement('div');
+    label.className = 'display-feed-label';
+    label.textContent = isUs ? 'US' : (participant.name || participant.identity);
+
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = false;
+
+    track.attach(video);
+
+    host.appendChild(label);
+    host.appendChild(video);
+  }
+
+  if (track.kind === 'audio') {
+    if (existingAudio) return;
+
+    const audio = document.createElement('audio');
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.style.display = 'none';
+
+    track.attach(audio);
+    host.appendChild(audio);
+  }
+}
+
+
+function renderDisplay() {
+  renderDisplayInfo();
+}
 
   function renderPulse() {
     const prompt = document.getElementById('venue-pulse-prompt');
@@ -1806,66 +1993,55 @@ async function bootRooms() {
     renderProduction();
   }
 
-  async function bootDisplay() {
-    const host = document.getElementById('display-video-host');
-    if (!host) {
-      renderDisplay();
-      return;
+async function bootDisplay() {
+  const host = document.getElementById('display-video-host');
+  const othersGrid = document.getElementById('display-others-grid');
+  const usHost = document.getElementById('display-us-feed');
+
+  renderDisplayInfo();
+
+  if (!currentRoomId()) {
+    if (othersGrid) {
+      othersGrid.innerHTML = `<div class="display-feed-box"><div class="display-placeholder">Join a room to use the display.</div></div>`;
     }
-
-    if (!currentRoomId()) {
-      host.innerHTML = `<div class="wall-empty">No room joined.</div>`;
-      return;
+    if (usHost) {
+      usHost.innerHTML = `<div class="display-feed-label">US</div><div class="display-placeholder">No room joined.</div>`;
     }
-
-    if (!lk) throw new Error('LiveKit client library is not loaded.');
-
-    await lk.connect({
-      roomName: livekitRoomName(currentRoomId()),
-      identity: `display_${currentVenueId()}`,
-      participantName: `Display ${currentVenueId()}`,
-      canPublish: false,
-      canSubscribe: true
-    });
-
-    function attachTrack(track, participant) {
-      if (track.kind !== 'video') return;
-
-      const existing = host.querySelector(`[data-participant="${participant.identity}"]`);
-      if (existing) return;
-
-      const card = document.createElement('div');
-      card.className = 'display-feed-card';
-      card.dataset.participant = participant.identity;
-
-      const title = document.createElement('h3');
-      title.textContent = participant.name || participant.identity;
-
-      const video = document.createElement('video');
-      video.autoplay = true;
-      video.playsInline = true;
-      video.muted = false;
-
-      track.attach(video);
-
-      card.appendChild(title);
-      card.appendChild(video);
-      host.appendChild(card);
-    }
-
-    lk.onTrackSubscribed(({ track, participant }) => {
-      attachTrack(track, participant);
-    });
-
-    const room = lk.getRoom();
-    room.remoteParticipants.forEach((participant) => {
-      participant.trackPublications.forEach((pub) => {
-        if (pub.track) attachTrack(pub.track, participant);
-      });
-    });
-
-    renderDisplay();
+    return;
   }
+
+  if (!lk) throw new Error('LiveKit client library is not loaded.');
+
+  await lk.connect({
+    roomName: livekitRoomName(currentRoomId()),
+    identity: `display_${currentVenueId()}`,
+    participantName: `Display ${currentVenueId()}`,
+    canPublish: false,
+    canSubscribe: true
+  });
+
+  lk.onTrackSubscribed(({ track, participant }) => {
+    attachDisplayTrack(track, participant);
+  });
+
+  lk.onTrackUnsubscribed(({ track, participant }) => {
+    const target = document.querySelector(`[data-participant="${participant.identity}"]`);
+    if (target && track.kind === 'video') {
+      target.innerHTML = `<div class="display-feed-label">${participant.name || participant.identity}</div><div class="display-placeholder">Feed disconnected.</div>`;
+    }
+  });
+
+  const room = lk.getRoom();
+  room.remoteParticipants.forEach((participant) => {
+    participant.trackPublications.forEach((pub) => {
+      if (pub.track) attachDisplayTrack(pub.track, participant);
+    });
+  });
+
+  window.addEventListener('beforeunload', () => {
+    clearDisplayTimer();
+  });
+}
 
   async function bootPulse() {
     renderPulse();
