@@ -1,4 +1,4 @@
-/*(function () {
+(function () {
   const db = window.LiveDB;
   const ui = window.LiveUI;
   const auth = window.LiveAuth;
@@ -557,7 +557,7 @@
   document.addEventListener('DOMContentLoaded', boot);
 })();
 
-*/
+
 
 
 
