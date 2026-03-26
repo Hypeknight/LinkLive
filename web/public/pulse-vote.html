@@ -134,12 +134,6 @@
       margin-top: 10px;
     }
 
-    .row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
     .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -164,7 +158,7 @@
       font-size: 13px;
     }
 
-    .vote-actions,
+    .pulse-cta-wrap,
     .question-actions,
     .social-actions {
       display: flex;
@@ -173,7 +167,7 @@
     }
 
     .btn,
-    .vote-btn,
+    .pulse-cta-btn,
     .question-btn {
       width: 100%;
       min-height: 48px;
@@ -211,7 +205,7 @@
     }
 
     .btn:disabled,
-    .vote-btn:disabled,
+    .pulse-cta-btn:disabled,
     .question-btn:disabled {
       opacity: .55;
       cursor: not-allowed;
@@ -313,6 +307,10 @@
       gap: 10px;
     }
 
+    .hidden {
+      display: none !important;
+    }
+
     @media (max-width: 920px) {
       .grid {
         grid-template-columns: 1fr;
@@ -361,16 +359,20 @@
       <div class="stack">
         <article class="card" id="pv-live-now-card">
           <h2 class="section-title">Live Now</h2>
-          <div id="pv-prompt-text" class="big-prompt">No active pulse prompt.</div>
-          <div id="pv-prompt-meta" class="sub">Waiting for live pulse…</div>
-          <div id="pv-timer" class="timer">—</div>
-        </article>
+          <div id="pv-prompt-shell">
+            <div id="pv-prompt-text" class="big-prompt">No active pulse prompt.</div>
+            <div id="pv-prompt-meta" class="sub">Waiting for live pulse…</div>
+            <div id="pv-timer" class="timer">—</div>
 
-        <article class="card" id="pv-vote-card">
-          <h2 class="section-title">Vote</h2>
-          <div id="pv-vote-status" class="sub">Vote once per pulse per verified session.</div>
-          <div id="pv-vote-actions" class="vote-actions">
-            <button class="vote-btn" disabled>No options available yet</button>
+            <div id="pv-pulse-cta-wrap" class="pulse-cta-wrap hidden">
+              <div id="pv-pulse-cta-status" class="sub">Respond before the timer ends.</div>
+              <div id="pv-pulse-cta-actions"></div>
+            </div>
+          </div>
+
+          <div id="pv-last-results" class="hidden" style="margin-top:14px;">
+            <h3 style="margin:0 0 8px;">Latest Results</h3>
+            <div id="pv-last-results-body" class="feed-list"></div>
           </div>
         </article>
 
@@ -411,22 +413,31 @@
             <button id="pv-hype-boost" class="btn success" type="button">Boost My Venue</button>
             <button id="pv-run-it-back" class="btn secondary" type="button">Run It Back</button>
           </div>
-          <div class="helper">Push your venue higher in the room standings. Quick actions keep the crowd engaged between live votes.</div>
+          <div class="helper">Push your venue higher in tonight’s standings. Quick actions keep the crowd engaged between pulse moments.</div>
+        </article>
+
+        <article class="card">
+          <h2 class="section-title">Tonight’s Score</h2>
+          <div id="pv-tonight-stats" class="stats">
+            <div class="stat"><strong>0%</strong><span>Venue Tonight</span></div>
+            <div class="stat"><strong>0%</strong><span>Room Tonight</span></div>
+            <div class="stat"><strong>0%</strong><span>City Tonight</span></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2 class="section-title">Average Score</h2>
+          <div id="pv-average-stats" class="stats">
+            <div class="stat"><strong>0%</strong><span>Venue Average</span></div>
+            <div class="stat"><strong>0%</strong><span>Room Average</span></div>
+            <div class="stat"><strong>0%</strong><span>City Average</span></div>
+          </div>
         </article>
 
         <article class="card">
           <h2 class="section-title">Room Standings</h2>
           <div id="pv-standings" class="standing-list">
             <div class="standing-item">Standings loading…</div>
-          </div>
-        </article>
-
-        <article class="card">
-          <h2 class="section-title">HypeMeter</h2>
-          <div id="pv-hype-stats" class="stats">
-            <div class="stat"><strong>0%</strong><span>Venue</span></div>
-            <div class="stat"><strong>0%</strong><span>Room</span></div>
-            <div class="stat"><strong>0%</strong><span>City</span></div>
           </div>
         </article>
 
@@ -440,17 +451,11 @@
         </article>
 
         <article class="card">
-          <h2 class="section-title">Other Live Pulses</h2>
-          <div id="pv-other-pulses" class="feed-list">
-            <div class="feed-item">No additional pulse data yet.</div>
-          </div>
-        </article>
-
-        <article class="card">
           <h2 class="section-title">About This Page</h2>
           <div class="stack helper">
             <div>You are participating as a verified guest at this venue.</div>
-            <div>You can vote, support your venue, post comments, send DJ requests, and answer questions while your session is active.</div>
+            <div>Pulses drive the night. When a live pulse appears, respond before the timer expires.</div>
+            <div>Comments and requests help shape the room, but live pulse prompts take priority.</div>
             <div>If you leave early, end your session below.</div>
           </div>
           <div style="margin-top:12px;">
@@ -464,8 +469,8 @@
   <div class="sticky-bottom">
     <div class="sticky-inner">
       <button id="pv-scroll-live" class="btn secondary" type="button">Live</button>
-      <button id="pv-scroll-vote" class="btn secondary" type="button">Vote</button>
       <button id="pv-scroll-social" class="btn secondary" type="button">Social</button>
+      <button id="pv-scroll-questions" class="btn secondary" type="button">Questions</button>
     </div>
   </div>
 </body>

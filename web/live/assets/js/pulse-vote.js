@@ -9,6 +9,7 @@
     venue: null,
     room: null,
     prompt: null,
+    lastClosedPrompt: null,
     pulseRows: [],
     comments: [],
     question: null,
@@ -107,6 +108,31 @@
     return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
   }
 
+  function nowMs() {
+    return Date.now();
+  }
+
+  function isPromptLive(prompt) {
+    if (!prompt) return false;
+    if (prompt.status !== 'live') return false;
+    if (prompt.ends_at && new Date(prompt.ends_at).getTime() <= nowMs()) return false;
+    return true;
+  }
+
+  function getPromptOptions(prompt) {
+    if (!prompt) return [];
+    if (Array.isArray(prompt.option_set_json)) return prompt.option_set_json;
+    if (typeof prompt.option_set_json === 'string') {
+      try {
+        const parsed = JSON.parse(prompt.option_set_json);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
+
   async function loadCheckinContext() {
     const params = qs();
     const roomId = params.get('room') || '';
@@ -153,12 +179,21 @@
       .order('created_at', { ascending: false })
       .limit(1);
 
+    const closedPromptQuery = db.client
+      .from('pulse_prompts')
+      .select('*')
+      .eq('room_id', state.roomId)
+      .eq('status', 'closed')
+      .eq('show_results_after_close', true)
+      .order('closed_at', { ascending: false })
+      .limit(1);
+
     const pulseQuery = db.client
       .from('patron_pulse')
       .select('*')
       .eq('room_id', state.roomId)
       .order('created_at', { ascending: false })
-      .limit(75);
+      .limit(150);
 
     const commentsQuery = db.client
       .from('pulse_comments')
@@ -175,25 +210,29 @@
       .order('created_at', { ascending: false })
       .limit(1);
 
-    const [promptRes, pulseRes, commentsRes, questionRes] = await Promise.all([
-    promptQuery.maybeSingle(),
-    pulseQuery,
-    commentsQuery,
-    questionQuery.maybeSingle()
+    const [promptRes, closedPromptRes, pulseRes, commentsRes, questionRes] = await Promise.all([
+      promptQuery.maybeSingle(),
+      closedPromptQuery.maybeSingle(),
+      pulseQuery,
+      commentsQuery,
+      questionQuery.maybeSingle()
     ]);
 
     if (promptRes.error) throw promptRes.error;
+    if (closedPromptRes.error) throw closedPromptRes.error;
     if (pulseRes.error) throw pulseRes.error;
     if (commentsRes.error) throw commentsRes.error;
 
     state.prompt = promptRes.data || null;
+    state.lastClosedPrompt = closedPromptRes.data || null;
     state.pulseRows = pulseRes.data || [];
     state.comments = commentsRes.data || [];
+
     if (questionRes.error) {
-    console.warn('general_questions lookup failed:', questionRes.error);
-    state.question = null;
+      console.warn('general_questions lookup failed:', questionRes.error);
+      state.question = null;
     } else {
-    state.question = questionRes.data || null;
+      state.question = questionRes.data || null;
     }
 
     if (!state.promptId && state.prompt?.id) {
@@ -225,7 +264,7 @@
 
     if (venueName) venueName.textContent = state.venue?.name || 'Venue';
     if (roomName) roomName.textContent = state.room?.title || 'Room';
-    if (phase) phase.textContent = state.prompt?.prompt_type || 'Waiting';
+    if (phase) phase.textContent = state.prompt?.prompt_type || state.lastClosedPrompt?.prompt_type || 'Waiting';
 
     const stored = getStoredPresence(state.venueId);
     if (sessionExpiry) {
@@ -237,20 +276,6 @@
     }
   }
 
-  function renderPrompt() {
-    const textEl = document.getElementById('pv-prompt-text');
-    const metaEl = document.getElementById('pv-prompt-meta');
-
-    if (textEl) textEl.textContent = state.prompt?.prompt_text || 'No active pulse prompt.';
-    if (metaEl) {
-      metaEl.textContent = state.prompt
-        ? `${state.prompt.prompt_type || 'vote'} • ${state.prompt.status || 'live'}`
-        : 'Waiting for live pulse…';
-    }
-
-    renderTimer();
-  }
-
   function renderTimer() {
     const timerEl = document.getElementById('pv-timer');
     if (!timerEl) return;
@@ -260,7 +285,7 @@
       state.timerHandle = null;
     }
 
-    if (!state.prompt?.ends_at) {
+    if (!isPromptLive(state.prompt) || !state.prompt?.ends_at) {
       timerEl.textContent = '—';
       return;
     }
@@ -274,6 +299,7 @@
       if (remaining <= 0 && state.timerHandle) {
         clearInterval(state.timerHandle);
         state.timerHandle = null;
+        renderPromptShell();
       }
     };
 
@@ -281,34 +307,176 @@
     state.timerHandle = setInterval(tick, 1000);
   }
 
-  function renderVoteActions() {
-    const host = document.getElementById('pv-vote-actions');
-    const status = document.getElementById('pv-vote-status');
-    if (!host) return;
+  function renderPromptShell() {
+    const textEl = document.getElementById('pv-prompt-text');
+    const metaEl = document.getElementById('pv-prompt-meta');
+    const resultsWrap = document.getElementById('pv-last-results');
+    const resultsBody = document.getElementById('pv-last-results-body');
 
-    const locked = !state.verified;
-    const voted = state.promptId ? hasPromptVoted(state.promptId) : false;
-
-    if (status) {
-      if (locked) {
-        status.textContent = 'Verify presence at the venue before voting.';
-      } else if (voted) {
-        status.textContent = 'You already voted in this pulse during this session.';
-      } else {
-        status.textContent = 'Vote once per pulse per verified session.';
-      }
+    if (isPromptLive(state.prompt)) {
+      if (textEl) textEl.textContent = state.prompt?.prompt_text || 'Live pulse';
+      if (metaEl) metaEl.textContent = `${state.prompt?.cta_type || state.prompt?.prompt_type || 'pulse'} • live`;
+      if (resultsWrap) resultsWrap.classList.add('hidden');
+      renderTimer();
+      renderPulseCta();
+      return;
     }
 
-    const defaultOptions = ['Venue A', 'Venue B', 'Freestyle', 'Dance Battle'];
+    if (state.lastClosedPrompt && state.lastClosedPrompt.show_results_after_close) {
+      if (textEl) textEl.textContent = 'Latest Pulse Closed';
+      if (metaEl) metaEl.textContent = state.lastClosedPrompt.prompt_text || 'Results visible after close';
+      if (resultsWrap) resultsWrap.classList.remove('hidden');
+      if (resultsBody) {
+        resultsBody.innerHTML = `
+          <div class="feed-item">
+            <div><strong>Prompt:</strong> ${esc(state.lastClosedPrompt.prompt_text || 'Pulse')}</div>
+            <div class="feed-time">Closed ${fmt(state.lastClosedPrompt.closed_at || state.lastClosedPrompt.updated_at || state.lastClosedPrompt.created_at)}</div>
+          </div>
+        `;
+      }
+      document.getElementById('pv-pulse-cta-wrap')?.classList.add('hidden');
+      if (textEl) document.getElementById('pv-timer').textContent = '—';
+      return;
+    }
 
-    host.innerHTML = defaultOptions.map((label, idx) => `
+    if (textEl) textEl.textContent = 'No active pulse prompt.';
+    if (metaEl) metaEl.textContent = 'Waiting for the next live pulse…';
+    document.getElementById('pv-pulse-cta-wrap')?.classList.add('hidden');
+    if (resultsWrap) resultsWrap.classList.add('hidden');
+    renderTimer();
+  }
+
+  function renderPulseCta() {
+    const wrap = document.getElementById('pv-pulse-cta-wrap');
+    const status = document.getElementById('pv-pulse-cta-status');
+    const host = document.getElementById('pv-pulse-cta-actions');
+    if (!wrap || !status || !host) return;
+
+    if (!isPromptLive(state.prompt)) {
+      wrap.classList.add('hidden');
+      host.innerHTML = '';
+      status.textContent = '';
+      return;
+    }
+
+    wrap.classList.remove('hidden');
+
+    const ctaType = String(state.prompt.cta_type || state.prompt.prompt_type || 'vote').toLowerCase();
+    const locked = !state.verified;
+    const responded = state.promptId ? hasPromptVoted(state.promptId) : false;
+
+    if (ctaType === 'comment') {
+      status.textContent = locked ? 'Verify presence before responding.' : (responded ? 'You already responded to this pulse.' : 'Comment on this pulse while it is live.');
+      host.innerHTML = `
+        <div class="pulse-cta-wrap">
+          <textarea id="pv-live-comment-input" rows="3" placeholder="Respond to the live pulse..." ${locked || responded ? 'disabled' : ''}></textarea>
+          <button id="pv-live-comment-submit" class="btn primary" ${locked || responded ? 'disabled' : ''} type="button">Send Live Comment</button>
+        </div>
+      `;
+
+      document.getElementById('pv-live-comment-submit')?.addEventListener('click', async () => {
+        const input = document.getElementById('pv-live-comment-input');
+        if (!input?.value.trim()) return showNotice('Enter a comment first.', true);
+
+        try {
+          const { error } = await db.client.from('pulse_comments').insert({
+            prompt_id: state.promptId || null,
+            venue_id: state.venueId,
+            room_id: state.roomId || null,
+            presence_session_id: state.presenceSessionId,
+            body: input.value.trim()
+          });
+          if (error) throw error;
+
+          markPromptVoted(state.promptId);
+          input.value = '';
+          await loadCore();
+          renderComments();
+          renderPromptShell();
+          showNotice('Live pulse comment received.');
+        } catch (err) {
+          showNotice(err.message || 'Unable to post live pulse comment.', true);
+        }
+      });
+
+      return;
+    }
+
+    if (ctaType === 'yell') {
+      status.textContent = locked ? 'Verify presence before responding.' : (responded ? 'You already responded to this pulse.' : 'Send a quick crowd reaction before the timer ends.');
+      host.innerHTML = `
+        <div class="pulse-cta-wrap">
+          <button class="pulse-cta-btn" data-yell="crowd_erupting" ${locked || responded ? 'disabled' : ''} type="button">Crowd Going Crazy</button>
+          <button class="pulse-cta-btn" data-yell="run_it_back" ${locked || responded ? 'disabled' : ''} type="button">Run It Back</button>
+          <button class="pulse-cta-btn" data-yell="venue_takeover" ${locked || responded ? 'disabled' : ''} type="button">Our Venue Taking Over</button>
+        </div>
+      `;
+
+      host.querySelectorAll('[data-yell]').forEach(btn => {
+        btn.onclick = async () => {
+          try {
+            const yellType = btn.dataset.yell;
+            let pulseScore = 90;
+            let energyLevel = 10;
+
+            if (yellType === 'run_it_back') {
+              pulseScore = 85;
+              energyLevel = 9;
+            }
+
+            const { error } = await db.client.from('patron_pulse').insert({
+              venue_id: String(state.venueId),
+              room_id: state.roomId || null,
+              presence_session_id: state.presenceSessionId,
+              pulse_score: pulseScore,
+              crowd_count: 1,
+              energy_level: energyLevel,
+              source: 'guest',
+              notes: yellType
+            });
+
+            if (error) throw error;
+
+            markPromptVoted(state.promptId);
+            await loadCore();
+            renderTonightStats();
+            renderStandings();
+            renderPromptShell();
+            showNotice('Crowd response sent.');
+          } catch (err) {
+            showNotice(err.message || 'Unable to send crowd response.', true);
+          }
+        };
+      });
+
+      return;
+    }
+
+    const promptOptions = getPromptOptions(state.prompt);
+    const options = promptOptions.length
+      ? promptOptions.map((opt, idx) => ({
+          id: opt.id || String(idx + 1),
+          label: opt.option_text || opt.label || String(opt)
+        }))
+      : [
+          { id: '1', label: 'Venue A' },
+          { id: '2', label: 'Venue B' },
+          { id: '3', label: 'Freestyle' },
+          { id: '4', label: 'Dance Battle' }
+        ];
+
+    status.textContent = locked
+      ? 'Verify presence before voting.'
+      : (responded ? 'You already responded to this pulse.' : 'Respond before the timer ends.');
+
+    host.innerHTML = options.map(opt => `
       <button
-        class="vote-btn"
-        data-vote="${idx + 1}"
-        ${locked || voted ? 'disabled' : ''}
+        class="pulse-cta-btn"
+        data-vote="${esc(opt.id)}"
+        ${locked || responded ? 'disabled' : ''}
         type="button"
       >
-        ${esc(label)}
+        ${esc(opt.label)}
       </button>
     `).join('');
 
@@ -333,19 +501,81 @@
           if (error) throw error;
 
           markPromptVoted(state.promptId);
-          renderVoteActions();
-          showNotice('Vote received.');
+          renderPromptShell();
+          showNotice('Pulse response received.');
         } catch (err) {
-          showNotice(err.message || 'Vote failed.', true);
+          showNotice(err.message || 'Pulse response failed.', true);
         }
       };
     });
   }
 
+  function serviceDayStartMs(resetTime = '08:30:00') {
+    const now = new Date();
+    const [h, m, s] = resetTime.split(':').map(n => Number(n || 0));
+    const start = new Date(now);
+    start.setHours(h, m, s || 0, 0);
+
+    if (now.getTime() < start.getTime()) {
+      start.setDate(start.getDate() - 1);
+    }
+    return start.getTime();
+  }
+
+  function tonightRows(rows) {
+    const resetTime = state.venue?.reset_time_local || '08:30:00';
+    const boundary = serviceDayStartMs(resetTime);
+    return rows.filter(r => new Date(r.created_at).getTime() >= boundary);
+  }
+
+  function averageValue(rows, key) {
+    return rows.length
+      ? Math.round(rows.reduce((a, b) => a + Number(b[key] || 0), 0) / rows.length)
+      : 0;
+  }
+
+  function renderTonightStats() {
+    const host = document.getElementById('pv-tonight-stats');
+    if (!host) return;
+
+    const tonight = tonightRows(state.pulseRows);
+    const venueRows = tonight.filter(p => String(p.venue_id) === String(state.venueId));
+    const roomRows = tonight.filter(p => String(p.room_id) === String(state.roomId));
+
+    const venueTonight = averageValue(venueRows, 'energy_level');
+    const roomTonight = averageValue(roomRows, 'pulse_score');
+    const cityTonight = venueTonight;
+
+    host.innerHTML = `
+      <div class="stat"><strong>${venueTonight}%</strong><span>Venue Tonight</span></div>
+      <div class="stat"><strong>${roomTonight}%</strong><span>Room Tonight</span></div>
+      <div class="stat"><strong>${cityTonight}%</strong><span>City Tonight</span></div>
+    `;
+  }
+
+  function renderAverageStats() {
+    const host = document.getElementById('pv-average-stats');
+    if (!host) return;
+
+    const venueRows = state.pulseRows.filter(p => String(p.venue_id) === String(state.venueId));
+    const roomRows = state.pulseRows.filter(p => String(p.room_id) === String(state.roomId));
+
+    const venueAvg = averageValue(venueRows, 'energy_level');
+    const roomAvg = averageValue(roomRows, 'pulse_score');
+    const cityAvg = venueAvg;
+
+    host.innerHTML = `
+      <div class="stat"><strong>${venueAvg}%</strong><span>Venue Average</span></div>
+      <div class="stat"><strong>${roomAvg}%</strong><span>Room Average</span></div>
+      <div class="stat"><strong>${cityAvg}%</strong><span>City Average</span></div>
+    `;
+  }
+
   function computeStandings() {
+    const tonight = tonightRows(state.pulseRows);
     const venueMap = new Map();
 
-    for (const row of state.pulseRows) {
+    for (const row of tonight) {
       const key = String(row.venue_id || '');
       if (!key) continue;
 
@@ -363,11 +593,9 @@
       item.entries += 1;
     }
 
-    const rows = Array.from(venueMap.values())
+    return Array.from(venueMap.values())
       .sort((a, b) => b.score - a.score)
       .map((row, idx) => ({ ...row, rank: idx + 1 }));
-
-    return rows;
   }
 
   function renderStandings() {
@@ -390,62 +618,26 @@
             <div class="bar">
               <div style="width:${Math.max(6, Math.round((row.score / maxScore) * 100))}%"></div>
             </div>
-            <div class="feed-time">${row.entries} pulse entries</div>
+            <div class="feed-time">${row.entries} tonight</div>
           </div>
         `).join('')
-      : `<div class="standing-item">Standings loading…</div>`;
-  }
-
-  function renderHype() {
-    const host = document.getElementById('pv-hype-stats');
-    if (!host) return;
-
-    const venueRows = state.pulseRows.filter(p => String(p.venue_id) === String(state.venueId));
-    const roomRows = state.pulseRows.filter(p => String(p.room_id) === String(state.roomId));
-
-    const avg = (rows, key) =>
-      rows.length ? Math.round(rows.reduce((a, b) => a + Number(b[key] || 0), 0) / rows.length) : 0;
-
-    const venueHype = avg(venueRows, 'energy_level');
-    const roomHype = avg(roomRows, 'pulse_score');
-    const cityHype = venueHype;
-
-    host.innerHTML = `
-      <div class="stat"><strong>${venueHype}%</strong><span>Venue</span></div>
-      <div class="stat"><strong>${roomHype}%</strong><span>Room</span></div>
-      <div class="stat"><strong>${cityHype}%</strong><span>City</span></div>
-    `;
+      : `<div class="standing-item">Tonight’s standings will appear as venues interact.</div>`;
   }
 
   function renderComments() {
     const host = document.getElementById('pv-comments');
     if (!host) return;
 
-    host.innerHTML = state.comments.length
-      ? state.comments.map(c => `
+    const tonight = tonightRows(state.comments);
+
+    host.innerHTML = tonight.length
+      ? tonight.map(c => `
           <div class="feed-item">
             <div>${esc(c.body || c.comment || '')}</div>
             <div class="feed-time">${fmt(c.created_at)}</div>
           </div>
         `).join('')
-      : `<div class="feed-item">No comments yet.</div>`;
-  }
-
-  function renderOtherPulses() {
-    const host = document.getElementById('pv-other-pulses');
-    if (!host) return;
-
-    const items = state.pulseRows.slice(0, 6);
-    host.innerHTML = items.length
-      ? items.map(p => `
-          <div class="feed-item">
-            <strong>Pulse:</strong> ${esc(p.pulse_score)} |
-            <strong>Energy:</strong> ${esc(p.energy_level)} |
-            <strong>Crowd:</strong> ${esc(p.crowd_count)}
-            <div class="feed-time">${fmt(p.created_at)}</div>
-          </div>
-        `).join('')
-      : `<div class="feed-item">No additional pulse data yet.</div>`;
+      : `<div class="feed-item">No comments yet tonight.</div>`;
   }
 
   function renderQuestions() {
@@ -551,9 +743,9 @@
       if (error) throw error;
 
       await loadCore();
-      renderHype();
+      renderTonightStats();
+      renderAverageStats();
       renderStandings();
-      renderOtherPulses();
       showNotice(kind === 'boost' ? 'Venue boost sent.' : 'Run-it-back pulse sent.');
     } catch (err) {
       showNotice(err.message || 'Unable to send quick pulse.', true);
@@ -645,7 +837,7 @@
       return false;
     }
 
-    showNotice('Verified at venue. You can participate in this live pulse.');
+    showNotice('Verified at venue. You can participate in tonight’s live experience.');
     return true;
   }
 
@@ -670,12 +862,12 @@
       document.getElementById('pv-live-now-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-    document.getElementById('pv-scroll-vote')?.addEventListener('click', () => {
-      document.getElementById('pv-vote-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-
     document.getElementById('pv-scroll-social')?.addEventListener('click', () => {
       document.getElementById('pv-social-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.getElementById('pv-scroll-questions')?.addEventListener('click', () => {
+      document.getElementById('pv-questions-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 
@@ -687,12 +879,11 @@
     const ok = evaluatePresence();
     if (!ok) return;
 
-    renderPrompt();
-    renderVoteActions();
-    renderHype();
-    renderComments();
-    renderOtherPulses();
+    renderPromptShell();
+    renderTonightStats();
+    renderAverageStats();
     renderStandings();
+    renderComments();
     renderQuestions();
     bindCommentSubmit();
     bindDjRequestSubmit();
