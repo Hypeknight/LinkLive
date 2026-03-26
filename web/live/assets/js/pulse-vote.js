@@ -39,25 +39,25 @@
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
 
-  function getGuestSessionKey() {
-    return `linkdn_guest_presence_${state.venueId || 'unknown'}`;
+  function getGuestSessionKey(venueId = null) {
+  return `linkdn_guest_presence_${venueId || state.venueId || 'unknown'}`;
   }
 
   function getVoteSessionKey(promptId) {
     return `linkdn_vote_${promptId}`;
   }
 
-  function getStoredPresence() {
-    try {
-      return JSON.parse(localStorage.getItem(getGuestSessionKey()) || 'null');
-    } catch (_) {
-      return null;
-    }
+  function getStoredPresence(venueId = null) {
+  try {
+    return JSON.parse(localStorage.getItem(getGuestSessionKey(venueId)) || 'null');
+  } catch (_) {
+    return null;
   }
+ }
 
   function storePresence(data) {
-    localStorage.setItem(getGuestSessionKey(), JSON.stringify(data));
-  }
+  localStorage.setItem(getGuestSessionKey(data?.venueId), JSON.stringify(data));
+ }
 
   function clearPresence() {
     localStorage.removeItem(getGuestSessionKey());
@@ -452,6 +452,10 @@
     const roomId = params.get('room') || '';
     const venueId = params.get('venue') || '';
     const promptId = params.get('prompt') || '';
+
+ state.roomId = roomId;
+  state.venueId = venueId;
+  state.promptId = promptId;
 
     try {
       const ctx = await loadCheckinContext();
