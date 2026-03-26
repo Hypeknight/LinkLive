@@ -176,10 +176,10 @@
       .limit(1);
 
     const [promptRes, pulseRes, commentsRes, questionRes] = await Promise.all([
-      promptQuery.maybeSingle(),
-      pulseQuery,
-      commentsQuery,
-      questionQuery.maybeSingle().catch(() => ({ data: null, error: null }))
+    promptQuery.maybeSingle(),
+    pulseQuery,
+    commentsQuery,
+    questionQuery.maybeSingle()
     ]);
 
     if (promptRes.error) throw promptRes.error;
@@ -189,7 +189,12 @@
     state.prompt = promptRes.data || null;
     state.pulseRows = pulseRes.data || [];
     state.comments = commentsRes.data || [];
-    state.question = questionRes?.data || null;
+    if (questionRes.error) {
+    console.warn('general_questions lookup failed:', questionRes.error);
+    state.question = null;
+    } else {
+    state.question = questionRes.data || null;
+    }
 
     if (!state.promptId && state.prompt?.id) {
       state.promptId = state.prompt.id;
