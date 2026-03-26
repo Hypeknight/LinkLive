@@ -508,6 +508,7 @@
           if (error) throw error;
 
           markQuestionAnswered(state.question.id);
+          await loadCore();
           renderQuestions();
           showNotice('Answer recorded.');
         } catch (err) {
@@ -539,6 +540,7 @@
       const { error } = await db.client.from('patron_pulse').insert({
         venue_id: String(state.venueId),
         room_id: state.roomId || null,
+        presence_session_id: state.presenceSessionId,
         pulse_score: pulseScore,
         crowd_count: crowdCount,
         energy_level: energyLevel,
@@ -610,6 +612,7 @@
         if (error) throw error;
 
         input.value = '';
+        await loadCore();
         showNotice('DJ request received.');
       } catch (err) {
         showNotice(err.message || 'DJ request failed.', true);
