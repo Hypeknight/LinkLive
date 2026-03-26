@@ -11,75 +11,148 @@
   <script src="/common/supabase.js"></script>
   <script src="/common/db.js"></script>
   <script src="/common/ui.js"></script>
-  <script defer src="/live/assets/js/pulse-vote.js"></script>
+  <script defer src="/public/assets/js/pulse-vote.js"></script>
 
   <style>
-    .public-shell {
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 24px 16px 48px;
+    :root {
+      --bg-card: #0f172a;
+      --bg-soft: rgba(255,255,255,.05);
+      --border-soft: rgba(255,255,255,.08);
+      --text-soft: rgba(255,255,255,.72);
+      --text-dim: rgba(255,255,255,.6);
     }
 
-    .public-grid {
-      display: grid;
-      grid-template-columns: 1.3fr .9fr;
-      gap: 16px;
-    }
-
-    .public-card {
-      background: #0f172a;
+    body {
+      background: #020617;
       color: #fff;
-      border-radius: 16px;
+    }
+
+    .public-shell {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 16px 14px 100px;
+    }
+
+    .hero-card,
+    .public-card {
+      background: var(--bg-card);
+      color: #fff;
+      border-radius: 18px;
       padding: 16px;
-      border: 1px solid rgba(255,255,255,.08);
+      border: 1px solid var(--border-soft);
       margin-bottom: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.2);
+    }
+
+    .hero-card {
+      position: sticky;
+      top: 10px;
+      z-index: 5;
+      backdrop-filter: blur(6px);
     }
 
     .public-title {
       font-size: 28px;
       font-weight: 800;
+      line-height: 1.1;
       margin-bottom: 6px;
     }
 
     .public-sub {
-      color: rgba(255,255,255,.72);
+      color: var(--text-soft);
       margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .public-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .public-pill {
-      display: inline-block;
-      padding: 6px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
       border-radius: 999px;
       background: rgba(255,255,255,.08);
-      margin-right: 8px;
       font-size: 13px;
     }
 
-    .pulse-timer {
-      font-size: 34px;
+    .notice {
+      background: #1e293b;
+      color: #fff;
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      line-height: 1.45;
+    }
+
+    .public-grid {
+      display: grid;
+      grid-template-columns: 1.2fr .9fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .section-title {
+      font-size: 20px;
       font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .pulse-timer {
+      font-size: 36px;
+      font-weight: 900;
       margin-top: 8px;
+      letter-spacing: 1px;
     }
 
     .vote-actions,
     .stack {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
 
-    .vote-btn {
+    .vote-btn,
+    .primary-btn,
+    .secondary-btn,
+    .danger-btn {
       width: 100%;
+      min-height: 48px;
       text-align: left;
       padding: 14px 16px;
-      border-radius: 12px;
+      border-radius: 14px;
       border: 1px solid rgba(255,255,255,.1);
-      background: rgba(255,255,255,.05);
+      background: var(--bg-soft);
       color: #fff;
       cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
     }
 
-    .vote-btn:disabled {
+    .primary-btn {
+      background: #2563eb;
+      border-color: #2563eb;
+      text-align: center;
+    }
+
+    .secondary-btn {
+      text-align: center;
+    }
+
+    .danger-btn {
+      background: #7f1d1d;
+      border-color: #7f1d1d;
+      text-align: center;
+    }
+
+    .vote-btn:disabled,
+    .primary-btn:disabled,
+    .secondary-btn:disabled,
+    .danger-btn:disabled {
       opacity: .5;
       cursor: not-allowed;
     }
@@ -91,8 +164,8 @@
     }
 
     .mini-stat {
-      background: rgba(255,255,255,.05);
-      border-radius: 12px;
+      background: var(--bg-soft);
+      border-radius: 14px;
       padding: 14px;
       text-align: center;
     }
@@ -103,46 +176,91 @@
       margin-bottom: 6px;
     }
 
+    .mini-stat span {
+      color: var(--text-soft);
+      font-size: 13px;
+    }
+
     textarea,
     input[type="text"] {
       width: 100%;
-      border-radius: 12px;
+      border-radius: 14px;
       border: 1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.05);
+      background: var(--bg-soft);
       color: #fff;
-      padding: 12px;
+      padding: 13px 14px;
+      font-size: 15px;
+    }
+
+    .helper-text {
+      color: var(--text-soft);
+      font-size: 13px;
+      line-height: 1.5;
     }
 
     .comment-list {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      max-height: 280px;
+      max-height: 320px;
       overflow: auto;
     }
 
     .comment-item {
-      background: rgba(255,255,255,.05);
-      border-radius: 12px;
-      padding: 10px 12px;
+      background: var(--bg-soft);
+      border-radius: 14px;
+      padding: 12px;
     }
 
     .comment-time {
       font-size: 12px;
-      color: rgba(255,255,255,.65);
+      color: var(--text-dim);
       margin-top: 6px;
     }
 
-    .notice {
-      background: #1e293b;
-      color: #fff;
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 16px;
+    .instructions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      color: var(--text-soft);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .sticky-bottom-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: rgba(2, 6, 23, .94);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(255,255,255,.08);
+      z-index: 20;
+    }
+
+    .sticky-bottom-inner {
+      max-width: 1040px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
 
     @media (max-width: 900px) {
       .public-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .public-title {
+        font-size: 24px;
+      }
+
+      .pulse-timer {
+        font-size: 30px;
+      }
+
+      .mini-stats {
         grid-template-columns: 1fr;
       }
     }
@@ -150,10 +268,11 @@
 </head>
 <body>
   <main class="public-shell">
-    <section class="public-card">
+    <section class="hero-card">
       <div class="public-title" id="pv-venue-name">Loading venue…</div>
       <div class="public-sub" id="pv-room-name">Loading room…</div>
-      <div>
+
+      <div class="public-pill-row">
         <span class="public-pill" id="pv-checkin-status">Checking access…</span>
         <span class="public-pill" id="pv-phase">Waiting…</span>
       </div>
@@ -166,14 +285,25 @@
     <section class="public-grid">
       <div>
         <article class="public-card">
-          <h2>Current Pulse</h2>
+          <div class="section-title">What You Can Do</div>
+          <div class="instructions-list">
+            <div>Vote in live venue pulses during the current room session.</div>
+            <div>Post comments that reflect what is happening in the venue right now.</div>
+            <div>Send DJ requests to influence the vibe in real time.</div>
+            <div>Track HypeMeter levels for your venue, room, and city.</div>
+            <div>You can only participate while your venue session is active.</div>
+          </div>
+        </article>
+
+        <article class="public-card">
+          <div class="section-title">Current Pulse</div>
           <div id="pv-prompt-text" class="public-title" style="font-size:22px;">No active pulse prompt.</div>
           <div id="pv-prompt-meta" class="public-sub">Waiting for live pulse…</div>
           <div id="pv-timer" class="pulse-timer">—</div>
         </article>
 
         <article class="public-card">
-          <h2>Vote</h2>
+          <div class="section-title">Vote</div>
           <div id="pv-vote-status" class="public-sub">Vote once per pulse per verified session.</div>
           <div id="pv-vote-actions" class="vote-actions">
             <button class="vote-btn" disabled>No options available yet</button>
@@ -181,10 +311,11 @@
         </article>
 
         <article class="public-card">
-          <h2>Comments</h2>
-          <div class="stack">
+          <div class="section-title">Comments</div>
+          <div class="helper-text">Share what the room feels like right now. Keep it relevant to the live experience.</div>
+          <div class="stack" style="margin-top:12px;">
             <textarea id="pv-comment-input" rows="4" placeholder="Drop a live comment..."></textarea>
-            <button id="pv-comment-submit" type="button">Post Comment</button>
+            <button id="pv-comment-submit" class="primary-btn" type="button">Post Comment</button>
           </div>
           <hr style="margin:16px 0; border-color: rgba(255,255,255,.08);" />
           <div id="pv-comments" class="comment-list">
@@ -195,7 +326,7 @@
 
       <div>
         <article class="public-card">
-          <h2>HypeMeter</h2>
+          <div class="section-title">HypeMeter</div>
           <div id="pv-hype-stats" class="mini-stats">
             <div class="mini-stat"><strong>0%</strong><span>Venue</span></div>
             <div class="mini-stat"><strong>0%</strong><span>Room</span></div>
@@ -204,21 +335,39 @@
         </article>
 
         <article class="public-card">
-          <h2>DJ Requests</h2>
-          <div class="stack">
+          <div class="section-title">DJ Requests</div>
+          <div class="helper-text">Request a song, artist, vibe, or energy shift for the room.</div>
+          <div class="stack" style="margin-top:12px;">
             <input id="pv-dj-request-input" type="text" placeholder="Request a song, artist, or vibe..." />
-            <button id="pv-dj-request-submit" type="button">Send Request</button>
+            <button id="pv-dj-request-submit" class="primary-btn" type="button">Send Request</button>
           </div>
         </article>
 
         <article class="public-card">
-          <h2>Other Live Pulses</h2>
+          <div class="section-title">Other Live Pulses</div>
           <div id="pv-other-pulses" class="stack">
             <div class="comment-item">No additional pulse data yet.</div>
+          </div>
+        </article>
+
+        <article class="public-card">
+          <div class="section-title">Session Control</div>
+          <div class="helper-text">
+            Leaving early ends your active venue interaction session on this phone. You can verify again later if needed.
+          </div>
+          <div class="stack" style="margin-top:12px;">
+            <button id="pv-leave-session" class="danger-btn" type="button">Leave Venue Session</button>
           </div>
         </article>
       </div>
     </section>
   </main>
+
+  <div class="sticky-bottom-bar">
+    <div class="sticky-bottom-inner">
+      <button id="pv-scroll-vote" class="secondary-btn" type="button">Jump to Vote</button>
+      <button id="pv-scroll-dj" class="secondary-btn" type="button">Jump to DJ</button>
+    </div>
+  </div>
 </body>
 </html>

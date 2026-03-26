@@ -91,6 +91,33 @@
     return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
   }
 
+
+  function leaveVenueSession() {
+  try {
+    clearPresence();
+    if (state.promptId) {
+      sessionStorage.removeItem(getVoteSessionKey(state.promptId));
+    }
+    window.location.href = `${location.origin}/public/pulse-checkin.html?room=${encodeURIComponent(state.roomId || '')}&venue=${encodeURIComponent(state.venueId || '')}${state.promptId ? `&prompt=${encodeURIComponent(state.promptId)}` : ''}`;
+  } catch (err) {
+    showNotice(err.message || 'Unable to leave venue session.', true);
+  }
+}
+
+function bindMobileActions() {
+  document.getElementById('pv-leave-session')?.addEventListener('click', leaveVenueSession);
+
+  document.getElementById('pv-scroll-vote')?.addEventListener('click', () => {
+    document.getElementById('pv-vote-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  document.getElementById('pv-scroll-dj')?.addEventListener('click', () => {
+    document.getElementById('pv-dj-request-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('pv-dj-request-input')?.focus();
+  });
+}
+
+
   async function loadCheckinContext() {
     const params = qs();
     const roomId = params.get('room') || '';
@@ -440,6 +467,7 @@
     renderOtherPulses();
     bindCommentSubmit();
     bindDjRequestSubmit();
+    bindMobileActions();
   }
 
   async function bootCheckinPage() {
