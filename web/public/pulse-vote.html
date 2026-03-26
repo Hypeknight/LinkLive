@@ -11,66 +11,73 @@
   <script src="/common/supabase.js"></script>
   <script src="/common/db.js"></script>
   <script src="/common/ui.js"></script>
-  <script defer src="/live/assets/js/pulse-vote.js"></script>
+  <script defer src="/public/assets/js/pulse-vote.js"></script>
 
   <style>
     :root {
-      --bg-card: #0f172a;
-      --bg-soft: rgba(255,255,255,.05);
-      --border-soft: rgba(255,255,255,.08);
+      --bg: #020617;
+      --card: #0f172a;
+      --card-soft: rgba(255,255,255,.05);
+      --border: rgba(255,255,255,.08);
       --text-soft: rgba(255,255,255,.72);
-      --text-dim: rgba(255,255,255,.6);
+      --text-dim: rgba(255,255,255,.58);
+      --primary: #2563eb;
+      --danger: #7f1d1d;
+      --success: #166534;
+      --gold: #f59e0b;
     }
+
+    * { box-sizing: border-box; }
 
     body {
-      background: #020617;
+      margin: 0;
+      background: var(--bg);
       color: #fff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    .public-shell {
-      max-width: 1040px;
+    .page {
+      max-width: 1080px;
       margin: 0 auto;
-      padding: 16px 14px 100px;
+      padding: 14px 14px 100px;
     }
 
-    .hero-card,
-    .public-card {
-      background: var(--bg-card);
-      color: #fff;
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: 18px;
       padding: 16px;
-      border: 1px solid var(--border-soft);
-      margin-bottom: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.2);
+      box-shadow: 0 10px 28px rgba(0,0,0,.2);
     }
 
-    .hero-card {
+    .hero {
       position: sticky;
       top: 10px;
-      z-index: 5;
+      z-index: 10;
+      margin-bottom: 14px;
       backdrop-filter: blur(6px);
     }
 
-    .public-title {
+    .title {
       font-size: 28px;
       font-weight: 800;
-      line-height: 1.1;
-      margin-bottom: 6px;
+      line-height: 1.05;
+      margin: 0 0 6px;
     }
 
-    .public-sub {
+    .sub {
       color: var(--text-soft);
-      margin-bottom: 12px;
       font-size: 14px;
+      margin: 0 0 12px;
     }
 
-    .public-pill-row {
+    .pill-row {
       display: flex;
-      flex-wrap: wrap;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
-    .public-pill {
+    .pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -81,104 +88,133 @@
     }
 
     .notice {
-      background: #1e293b;
-      color: #fff;
       border-radius: 14px;
       padding: 12px 14px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
+      background: #1e293b;
       line-height: 1.45;
     }
 
-    .public-grid {
+    .grid {
       display: grid;
-      grid-template-columns: 1.2fr .9fr;
-      gap: 16px;
+      grid-template-columns: 1.25fr .95fr;
+      gap: 14px;
       align-items: start;
     }
 
-    .section-title {
-      font-size: 20px;
-      font-weight: 800;
-      margin-bottom: 10px;
-    }
-
-    .pulse-timer {
-      font-size: 36px;
-      font-weight: 900;
-      margin-top: 8px;
-      letter-spacing: 1px;
-    }
-
-    .vote-actions,
     .stack {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
 
-    .vote-btn,
-    .primary-btn,
-    .secondary-btn,
-    .danger-btn {
-      width: 100%;
-      min-height: 48px;
-      text-align: left;
-      padding: 14px 16px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.1);
-      background: var(--bg-soft);
-      color: #fff;
-      cursor: pointer;
-      font-size: 15px;
-      font-weight: 600;
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 20px;
+      font-weight: 800;
     }
 
-    .primary-btn {
-      background: #2563eb;
-      border-color: #2563eb;
-      text-align: center;
+    .helper {
+      color: var(--text-soft);
+      font-size: 13px;
+      line-height: 1.45;
     }
 
-    .secondary-btn {
-      text-align: center;
+    .big-prompt {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.2;
+      margin: 0 0 8px;
     }
 
-    .danger-btn {
-      background: #7f1d1d;
-      border-color: #7f1d1d;
-      text-align: center;
+    .timer {
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      margin-top: 10px;
     }
 
-    .vote-btn:disabled,
-    .primary-btn:disabled,
-    .secondary-btn:disabled,
-    .danger-btn:disabled {
-      opacity: .5;
-      cursor: not-allowed;
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
-    .mini-stats {
+    .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
+      gap: 10px;
     }
 
-    .mini-stat {
-      background: var(--bg-soft);
+    .stat {
+      background: var(--card-soft);
       border-radius: 14px;
       padding: 14px;
       text-align: center;
     }
 
-    .mini-stat strong {
+    .stat strong {
       display: block;
       font-size: 24px;
       margin-bottom: 6px;
     }
 
-    .mini-stat span {
+    .stat span {
       color: var(--text-soft);
       font-size: 13px;
+    }
+
+    .vote-actions,
+    .question-actions,
+    .social-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn,
+    .vote-btn,
+    .question-btn {
+      width: 100%;
+      min-height: 48px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: var(--card-soft);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .btn.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      text-align: center;
+    }
+
+    .btn.secondary {
+      text-align: center;
+    }
+
+    .btn.success {
+      background: var(--success);
+      border-color: var(--success);
+      text-align: center;
+    }
+
+    .btn.danger {
+      background: var(--danger);
+      border-color: var(--danger);
+      text-align: center;
+    }
+
+    .btn:disabled,
+    .vote-btn:disabled,
+    .question-btn:disabled {
+      opacity: .55;
+      cursor: not-allowed;
     }
 
     textarea,
@@ -186,19 +222,13 @@
       width: 100%;
       border-radius: 14px;
       border: 1px solid rgba(255,255,255,.12);
-      background: var(--bg-soft);
+      background: var(--card-soft);
       color: #fff;
       padding: 13px 14px;
       font-size: 15px;
     }
 
-    .helper-text {
-      color: var(--text-soft);
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    .comment-list {
+    .feed-list {
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -206,75 +236,120 @@
       overflow: auto;
     }
 
-    .comment-item {
-      background: var(--bg-soft);
+    .feed-item {
+      background: var(--card-soft);
       border-radius: 14px;
       padding: 12px;
     }
 
-    .comment-time {
-      font-size: 12px;
-      color: var(--text-dim);
+    .feed-time {
       margin-top: 6px;
+      color: var(--text-dim);
+      font-size: 12px;
     }
 
-    .instructions-list {
+    .standing-list {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      color: var(--text-soft);
-      font-size: 14px;
-      line-height: 1.45;
     }
 
-    .sticky-bottom-bar {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-      background: rgba(2, 6, 23, .94);
-      backdrop-filter: blur(8px);
-      border-top: 1px solid rgba(255,255,255,.08);
-      z-index: 20;
+    .standing-item {
+      background: var(--card-soft);
+      border-radius: 14px;
+      padding: 12px;
     }
 
-    .sticky-bottom-inner {
-      max-width: 1040px;
-      margin: 0 auto;
+    .standing-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .standing-rank {
+      font-weight: 900;
+      color: var(--gold);
+    }
+
+    .bar {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      overflow: hidden;
+    }
+
+    .bar > div {
+      height: 100%;
+      background: linear-gradient(90deg, #2563eb, #60a5fa);
+      width: 0%;
+    }
+
+    .mini-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
 
-    @media (max-width: 900px) {
-      .public-grid {
+    .sticky-bottom {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: rgba(2,6,23,.94);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(255,255,255,.08);
+      z-index: 30;
+    }
+
+    .sticky-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 920px) {
+      .grid {
         grid-template-columns: 1fr;
       }
 
-      .public-title {
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .mini-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .sticky-inner {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .title {
         font-size: 24px;
       }
 
-      .pulse-timer {
+      .timer {
         font-size: 30px;
-      }
-
-      .mini-stats {
-        grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
-  <main class="public-shell">
-    <section class="hero-card">
-      <div class="public-title" id="pv-venue-name">Loading venue…</div>
-      <div class="public-sub" id="pv-room-name">Loading room…</div>
+  <main class="page">
+    <section class="card hero">
+      <h1 id="pv-venue-name" class="title">Loading venue…</h1>
+      <p id="pv-room-name" class="sub">Loading room…</p>
 
-      <div class="public-pill-row">
-        <span class="public-pill" id="pv-checkin-status">Checking access…</span>
-        <span class="public-pill" id="pv-phase">Waiting…</span>
+      <div class="pill-row">
+        <span id="pv-checkin-status" class="pill">Checking access…</span>
+        <span id="pv-phase" class="pill">Waiting…</span>
+        <span id="pv-session-expiry" class="pill">Session…</span>
       </div>
     </section>
 
@@ -282,91 +357,115 @@
       Verifying that you're at the venue…
     </div>
 
-    <section class="public-grid">
-      <div>
-        <article class="public-card">
-          <div class="section-title">What You Can Do</div>
-          <div class="instructions-list">
-            <div>Vote in live venue pulses during the current room session.</div>
-            <div>Post comments that reflect what is happening in the venue right now.</div>
-            <div>Send DJ requests to influence the vibe in real time.</div>
-            <div>Track HypeMeter levels for your venue, room, and city.</div>
-            <div>You can only participate while your venue session is active.</div>
-          </div>
+    <section class="grid">
+      <div class="stack">
+        <article class="card" id="pv-live-now-card">
+          <h2 class="section-title">Live Now</h2>
+          <div id="pv-prompt-text" class="big-prompt">No active pulse prompt.</div>
+          <div id="pv-prompt-meta" class="sub">Waiting for live pulse…</div>
+          <div id="pv-timer" class="timer">—</div>
         </article>
 
-        <article class="public-card">
-          <div class="section-title">Current Pulse</div>
-          <div id="pv-prompt-text" class="public-title" style="font-size:22px;">No active pulse prompt.</div>
-          <div id="pv-prompt-meta" class="public-sub">Waiting for live pulse…</div>
-          <div id="pv-timer" class="pulse-timer">—</div>
-        </article>
-
-        <article class="public-card">
-          <div class="section-title">Vote</div>
-          <div id="pv-vote-status" class="public-sub">Vote once per pulse per verified session.</div>
+        <article class="card" id="pv-vote-card">
+          <h2 class="section-title">Vote</h2>
+          <div id="pv-vote-status" class="sub">Vote once per pulse per verified session.</div>
           <div id="pv-vote-actions" class="vote-actions">
             <button class="vote-btn" disabled>No options available yet</button>
           </div>
         </article>
 
-        <article class="public-card">
-          <div class="section-title">Comments</div>
-          <div class="helper-text">Share what the room feels like right now. Keep it relevant to the live experience.</div>
-          <div class="stack" style="margin-top:12px;">
-            <textarea id="pv-comment-input" rows="4" placeholder="Drop a live comment..."></textarea>
-            <button id="pv-comment-submit" class="primary-btn" type="button">Post Comment</button>
+        <article class="card" id="pv-social-card">
+          <h2 class="section-title">Social</h2>
+
+          <div class="stack">
+            <div>
+              <div class="helper">Comments</div>
+              <textarea id="pv-comment-input" rows="4" placeholder="Drop a live comment..."></textarea>
+              <div style="margin-top:10px;">
+                <button id="pv-comment-submit" class="btn primary" type="button">Post Comment</button>
+              </div>
+            </div>
+
+            <div>
+              <div class="helper">DJ Requests</div>
+              <input id="pv-dj-request-input" type="text" placeholder="Request a song, artist, or vibe..." />
+              <div style="margin-top:10px;">
+                <button id="pv-dj-request-submit" class="btn primary" type="button">Send Request</button>
+              </div>
+            </div>
           </div>
-          <hr style="margin:16px 0; border-color: rgba(255,255,255,.08);" />
-          <div id="pv-comments" class="comment-list">
-            <div class="comment-item">No comments yet.</div>
+        </article>
+
+        <article class="card">
+          <h2 class="section-title">Live Comments</h2>
+          <div id="pv-comments" class="feed-list">
+            <div class="feed-item">No comments yet.</div>
           </div>
         </article>
       </div>
 
-      <div>
-        <article class="public-card">
-          <div class="section-title">HypeMeter</div>
-          <div id="pv-hype-stats" class="mini-stats">
-            <div class="mini-stat"><strong>0%</strong><span>Venue</span></div>
-            <div class="mini-stat"><strong>0%</strong><span>Room</span></div>
-            <div class="mini-stat"><strong>0%</strong><span>City</span></div>
+      <div class="stack">
+        <article class="card" id="pv-support-card">
+          <h2 class="section-title">Support Your Venue</h2>
+          <div class="mini-grid" style="margin-bottom:12px;">
+            <button id="pv-hype-boost" class="btn success" type="button">Boost My Venue</button>
+            <button id="pv-run-it-back" class="btn secondary" type="button">Run It Back</button>
+          </div>
+          <div class="helper">Push your venue higher in the room standings. Quick actions keep the crowd engaged between live votes.</div>
+        </article>
+
+        <article class="card">
+          <h2 class="section-title">Room Standings</h2>
+          <div id="pv-standings" class="standing-list">
+            <div class="standing-item">Standings loading…</div>
           </div>
         </article>
 
-        <article class="public-card">
-          <div class="section-title">DJ Requests</div>
-          <div class="helper-text">Request a song, artist, vibe, or energy shift for the room.</div>
-          <div class="stack" style="margin-top:12px;">
-            <input id="pv-dj-request-input" type="text" placeholder="Request a song, artist, or vibe..." />
-            <button id="pv-dj-request-submit" class="primary-btn" type="button">Send Request</button>
+        <article class="card">
+          <h2 class="section-title">HypeMeter</h2>
+          <div id="pv-hype-stats" class="stats">
+            <div class="stat"><strong>0%</strong><span>Venue</span></div>
+            <div class="stat"><strong>0%</strong><span>Room</span></div>
+            <div class="stat"><strong>0%</strong><span>City</span></div>
           </div>
         </article>
 
-        <article class="public-card">
-          <div class="section-title">Other Live Pulses</div>
-          <div id="pv-other-pulses" class="stack">
-            <div class="comment-item">No additional pulse data yet.</div>
+        <article class="card" id="pv-questions-card">
+          <h2 class="section-title">Questions</h2>
+          <div id="pv-question-text" class="big-prompt" style="font-size:20px;">No general question right now.</div>
+          <div id="pv-question-meta" class="sub">System, venue, and room prompts can appear here.</div>
+          <div id="pv-question-actions" class="question-actions">
+            <button class="question-btn" disabled>No answer choices yet</button>
           </div>
         </article>
 
-        <article class="public-card">
-          <div class="section-title">Session Control</div>
-          <div class="helper-text">
-            Leaving early ends your active venue interaction session on this phone. You can verify again later if needed.
+        <article class="card">
+          <h2 class="section-title">Other Live Pulses</h2>
+          <div id="pv-other-pulses" class="feed-list">
+            <div class="feed-item">No additional pulse data yet.</div>
           </div>
-          <div class="stack" style="margin-top:12px;">
-            <button id="pv-leave-session" class="danger-btn" type="button">Leave Venue Session</button>
+        </article>
+
+        <article class="card">
+          <h2 class="section-title">About This Page</h2>
+          <div class="stack helper">
+            <div>You are participating as a verified guest at this venue.</div>
+            <div>You can vote, support your venue, post comments, send DJ requests, and answer questions while your session is active.</div>
+            <div>If you leave early, end your session below.</div>
+          </div>
+          <div style="margin-top:12px;">
+            <button id="pv-leave-session" class="btn danger" type="button">Leave Venue Session</button>
           </div>
         </article>
       </div>
     </section>
   </main>
 
-  <div class="sticky-bottom-bar">
-    <div class="sticky-bottom-inner">
-      <button id="pv-scroll-vote" class="secondary-btn" type="button">Jump to Vote</button>
-      <button id="pv-scroll-dj" class="secondary-btn" type="button">Jump to DJ</button>
+  <div class="sticky-bottom">
+    <div class="sticky-inner">
+      <button id="pv-scroll-live" class="btn secondary" type="button">Live</button>
+      <button id="pv-scroll-vote" class="btn secondary" type="button">Vote</button>
+      <button id="pv-scroll-social" class="btn secondary" type="button">Social</button>
     </div>
   </div>
 </body>

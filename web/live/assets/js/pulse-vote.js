@@ -11,6 +11,8 @@
     prompt: null,
     pulseRows: [],
     comments: [],
+    question: null,
+    questionAnswers: [],
     verified: false,
     presenceSessionId: null,
     presenceSessionToken: null,
@@ -40,24 +42,28 @@
   }
 
   function getGuestSessionKey(venueId = null) {
-  return `linkdn_guest_presence_${venueId || state.venueId || 'unknown'}`;
+    return `linkdn_guest_presence_${venueId || state.venueId || 'unknown'}`;
   }
 
   function getVoteSessionKey(promptId) {
     return `linkdn_vote_${promptId}`;
   }
 
-  function getStoredPresence(venueId = null) {
-  try {
-    return JSON.parse(localStorage.getItem(getGuestSessionKey(venueId)) || 'null');
-  } catch (_) {
-    return null;
+  function getQuestionSessionKey(questionId) {
+    return `linkdn_question_${questionId}`;
   }
- }
+
+  function getStoredPresence(venueId = null) {
+    try {
+      return JSON.parse(localStorage.getItem(getGuestSessionKey(venueId)) || 'null');
+    } catch (_) {
+      return null;
+    }
+  }
 
   function storePresence(data) {
-  localStorage.setItem(getGuestSessionKey(data?.venueId), JSON.stringify(data));
- }
+    localStorage.setItem(getGuestSessionKey(data?.venueId), JSON.stringify(data));
+  }
 
   function clearPresence() {
     localStorage.removeItem(getGuestSessionKey());
@@ -71,6 +77,16 @@
   function hasPromptVoted(promptId) {
     if (!promptId) return false;
     return sessionStorage.getItem(getVoteSessionKey(promptId)) === '1';
+  }
+
+  function markQuestionAnswered(questionId) {
+    if (!questionId) return;
+    sessionStorage.setItem(getQuestionSessionKey(questionId), '1');
+  }
+
+  function hasQuestionAnswered(questionId) {
+    if (!questionId) return false;
+    return sessionStorage.getItem(getQuestionSessionKey(questionId)) === '1';
   }
 
   function showNotice(text, isError = false) {
@@ -90,33 +106,6 @@
   function randomGuestSessionToken() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
   }
-
-
-  function leaveVenueSession() {
-  try {
-    clearPresence();
-    if (state.promptId) {
-      sessionStorage.removeItem(getVoteSessionKey(state.promptId));
-    }
-    window.location.href = `${location.origin}/public/pulse-checkin.html?room=${encodeURIComponent(state.roomId || '')}&venue=${encodeURIComponent(state.venueId || '')}${state.promptId ? `&prompt=${encodeURIComponent(state.promptId)}` : ''}`;
-  } catch (err) {
-    showNotice(err.message || 'Unable to leave venue session.', true);
-  }
-}
-
-function bindMobileActions() {
-  document.getElementById('pv-leave-session')?.addEventListener('click', leaveVenueSession);
-
-  document.getElementById('pv-scroll-vote')?.addEventListener('click', () => {
-    document.getElementById('pv-vote-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-
-  document.getElementById('pv-scroll-dj')?.addEventListener('click', () => {
-    document.getElementById('pv-dj-request-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    document.getElementById('pv-dj-request-input')?.focus();
-  });
-}
-
 
   async function loadCheckinContext() {
     const params = qs();
@@ -169,7 +158,7 @@ function bindMobileActions() {
       .select('*')
       .eq('room_id', state.roomId)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(75);
 
     const commentsQuery = db.client
       .from('pulse_comments')
@@ -178,10 +167,19 @@ function bindMobileActions() {
       .order('created_at', { ascending: false })
       .limit(50);
 
-    const [promptRes, pulseRes, commentsRes] = await Promise.all([
+    const questionQuery = db.client
+      .from('general_questions')
+      .select('*')
+      .eq('is_active', true)
+      .or(`room_id.eq.${state.roomId},venue_id.eq.${state.venueId}`)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const [promptRes, pulseRes, commentsRes, questionRes] = await Promise.all([
       promptQuery.maybeSingle(),
       pulseQuery,
-      commentsQuery
+      commentsQuery,
+      questionQuery.maybeSingle().catch(() => ({ data: null, error: null }))
     ]);
 
     if (promptRes.error) throw promptRes.error;
@@ -191,9 +189,26 @@ function bindMobileActions() {
     state.prompt = promptRes.data || null;
     state.pulseRows = pulseRes.data || [];
     state.comments = commentsRes.data || [];
+    state.question = questionRes?.data || null;
 
     if (!state.promptId && state.prompt?.id) {
       state.promptId = state.prompt.id;
+    }
+
+    if (state.question?.id) {
+      const questionOptionsRes = await db.client
+        .from('general_question_options')
+        .select('*')
+        .eq('question_id', state.question.id)
+        .order('sort_order', { ascending: true });
+
+      if (!questionOptionsRes.error) {
+        state.questionAnswers = questionOptionsRes.data || [];
+      } else {
+        state.questionAnswers = [];
+      }
+    } else {
+      state.questionAnswers = [];
     }
   }
 
@@ -201,10 +216,20 @@ function bindMobileActions() {
     const venueName = document.getElementById('pv-venue-name');
     const roomName = document.getElementById('pv-room-name');
     const phase = document.getElementById('pv-phase');
+    const sessionExpiry = document.getElementById('pv-session-expiry');
 
     if (venueName) venueName.textContent = state.venue?.name || 'Venue';
     if (roomName) roomName.textContent = state.room?.title || 'Room';
     if (phase) phase.textContent = state.prompt?.prompt_type || 'Waiting';
+
+    const stored = getStoredPresence(state.venueId);
+    if (sessionExpiry) {
+      if (stored?.expiresAt) {
+        sessionExpiry.textContent = `Session until ${new Date(stored.expiresAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+      } else {
+        sessionExpiry.textContent = 'Session inactive';
+      }
+    }
   }
 
   function renderPrompt() {
@@ -312,6 +337,60 @@ function bindMobileActions() {
     });
   }
 
+  function computeStandings() {
+    const venueMap = new Map();
+
+    for (const row of state.pulseRows) {
+      const key = String(row.venue_id || '');
+      if (!key) continue;
+
+      if (!venueMap.has(key)) {
+        venueMap.set(key, {
+          venue_id: key,
+          venue_name: key === String(state.venueId) ? (state.venue?.name || 'Your Venue') : key,
+          score: 0,
+          entries: 0,
+        });
+      }
+
+      const item = venueMap.get(key);
+      item.score += Number(row.pulse_score || 0) + Number(row.energy_level || 0);
+      item.entries += 1;
+    }
+
+    const rows = Array.from(venueMap.values())
+      .sort((a, b) => b.score - a.score)
+      .map((row, idx) => ({ ...row, rank: idx + 1 }));
+
+    return rows;
+  }
+
+  function renderStandings() {
+    const host = document.getElementById('pv-standings');
+    if (!host) return;
+
+    const standings = computeStandings();
+    const maxScore = Math.max(...standings.map(s => s.score), 1);
+
+    host.innerHTML = standings.length
+      ? standings.map(row => `
+          <div class="standing-item">
+            <div class="standing-top">
+              <div>
+                <div class="standing-rank">#${row.rank}</div>
+                <div>${esc(row.venue_name)}</div>
+              </div>
+              <div>${row.score} pts</div>
+            </div>
+            <div class="bar">
+              <div style="width:${Math.max(6, Math.round((row.score / maxScore) * 100))}%"></div>
+            </div>
+            <div class="feed-time">${row.entries} pulse entries</div>
+          </div>
+        `).join('')
+      : `<div class="standing-item">Standings loading…</div>`;
+  }
+
   function renderHype() {
     const host = document.getElementById('pv-hype-stats');
     if (!host) return;
@@ -327,9 +406,9 @@ function bindMobileActions() {
     const cityHype = venueHype;
 
     host.innerHTML = `
-      <div class="mini-stat"><strong>${venueHype}%</strong><span>Venue</span></div>
-      <div class="mini-stat"><strong>${roomHype}%</strong><span>Room</span></div>
-      <div class="mini-stat"><strong>${cityHype}%</strong><span>City</span></div>
+      <div class="stat"><strong>${venueHype}%</strong><span>Venue</span></div>
+      <div class="stat"><strong>${roomHype}%</strong><span>Room</span></div>
+      <div class="stat"><strong>${cityHype}%</strong><span>City</span></div>
     `;
   }
 
@@ -339,29 +418,139 @@ function bindMobileActions() {
 
     host.innerHTML = state.comments.length
       ? state.comments.map(c => `
-          <div class="comment-item">
+          <div class="feed-item">
             <div>${esc(c.body || c.comment || '')}</div>
-            <div class="comment-time">${fmt(c.created_at)}</div>
+            <div class="feed-time">${fmt(c.created_at)}</div>
           </div>
         `).join('')
-      : `<div class="comment-item">No comments yet.</div>`;
+      : `<div class="feed-item">No comments yet.</div>`;
   }
 
   function renderOtherPulses() {
     const host = document.getElementById('pv-other-pulses');
     if (!host) return;
 
-    const items = state.pulseRows.slice(0, 5);
+    const items = state.pulseRows.slice(0, 6);
     host.innerHTML = items.length
       ? items.map(p => `
-          <div class="comment-item">
+          <div class="feed-item">
             <strong>Pulse:</strong> ${esc(p.pulse_score)} |
             <strong>Energy:</strong> ${esc(p.energy_level)} |
             <strong>Crowd:</strong> ${esc(p.crowd_count)}
-            <div class="comment-time">${fmt(p.created_at)}</div>
+            <div class="feed-time">${fmt(p.created_at)}</div>
           </div>
         `).join('')
-      : `<div class="comment-item">No additional pulse data yet.</div>`;
+      : `<div class="feed-item">No additional pulse data yet.</div>`;
+  }
+
+  function renderQuestions() {
+    const textEl = document.getElementById('pv-question-text');
+    const metaEl = document.getElementById('pv-question-meta');
+    const host = document.getElementById('pv-question-actions');
+    if (!textEl || !metaEl || !host) return;
+
+    const locked = !state.verified;
+    const answered = state.question?.id ? hasQuestionAnswered(state.question.id) : false;
+
+    if (!state.question) {
+      textEl.textContent = 'No general question right now.';
+      metaEl.textContent = 'System, venue, and room prompts can appear here.';
+      host.innerHTML = `<button class="question-btn" disabled>No answer choices yet</button>`;
+      return;
+    }
+
+    textEl.textContent = state.question.question_text || state.question.title || 'Question';
+    metaEl.textContent = answered
+      ? 'You already answered this question in this session.'
+      : 'Quick response to keep the room interactive.';
+
+    const options = state.questionAnswers.length
+      ? state.questionAnswers
+      : [
+          { id: '1', label: 'Yes' },
+          { id: '2', label: 'No' },
+          { id: '3', label: 'Maybe' }
+        ];
+
+    host.innerHTML = options.map(opt => `
+      <button
+        class="question-btn"
+        data-question-option="${esc(opt.id)}"
+        ${locked || answered ? 'disabled' : ''}
+        type="button"
+      >
+        ${esc(opt.option_text || opt.label || opt.id)}
+      </button>
+    `).join('');
+
+    host.querySelectorAll('[data-question-option]').forEach(btn => {
+      btn.onclick = async () => {
+        try {
+          if (!state.verified) throw new Error('Verify presence before answering questions.');
+          if (!state.question?.id) throw new Error('No active question.');
+          if (answered || hasQuestionAnswered(state.question.id)) throw new Error('Already answered.');
+
+          const optionId = btn.dataset.questionOption;
+
+          const { error } = await db.client.from('general_question_answers').insert({
+            question_id: state.question.id,
+            option_id: optionId,
+            venue_id: state.venueId,
+            room_id: state.roomId || null,
+            presence_session_id: state.presenceSessionId
+          });
+
+          if (error) throw error;
+
+          markQuestionAnswered(state.question.id);
+          renderQuestions();
+          showNotice('Answer recorded.');
+        } catch (err) {
+          showNotice(err.message || 'Question answer failed.', true);
+        }
+      };
+    });
+  }
+
+  async function submitQuickPulse(kind) {
+    try {
+      if (!state.verified) throw new Error('Verify presence first.');
+      if (!state.presenceSessionId) throw new Error('No verified guest session.');
+
+      let pulseScore = 80;
+      let energyLevel = 8;
+      let crowdCount = 1;
+      let notes = kind;
+
+      if (kind === 'boost') {
+        pulseScore = 95;
+        energyLevel = 10;
+      }
+      if (kind === 'run_it_back') {
+        pulseScore = 88;
+        energyLevel = 9;
+      }
+
+      const { error } = await db.client.from('patron_pulse').insert({
+        venue_id: String(state.venueId),
+        room_id: state.roomId || null,
+        pulse_score: pulseScore,
+        crowd_count: crowdCount,
+        energy_level: energyLevel,
+        source: 'guest',
+        notes
+      });
+
+      if (error) throw error;
+
+      await loadCore();
+      renderHype();
+      renderStandings();
+      renderOtherPulses();
+      showNotice(kind === 'boost' ? 'Venue boost sent.' : 'Run-it-back pulse sent.');
+    } catch (err) {
+      showNotice(err.message || 'Unable to send quick pulse.', true);
+    }
   }
 
   function bindCommentSubmit() {
@@ -424,7 +613,7 @@ function bindMobileActions() {
   }
 
   function evaluatePresence() {
-    const stored = getStoredPresence();
+    const stored = getStoredPresence(state.venueId);
     const statusEl = document.getElementById('pv-checkin-status');
 
     const valid =
@@ -452,6 +641,36 @@ function bindMobileActions() {
     return true;
   }
 
+  function leaveVenueSession() {
+    try {
+      clearPresence();
+      if (state.promptId) sessionStorage.removeItem(getVoteSessionKey(state.promptId));
+      if (state.question?.id) sessionStorage.removeItem(getQuestionSessionKey(state.question.id));
+
+      window.location.href = `${location.origin}/public/pulse-checkin.html?room=${encodeURIComponent(state.roomId || '')}&venue=${encodeURIComponent(state.venueId || '')}${state.promptId ? `&prompt=${encodeURIComponent(state.promptId)}` : ''}`;
+    } catch (err) {
+      showNotice(err.message || 'Unable to leave venue session.', true);
+    }
+  }
+
+  function bindMobileActions() {
+    document.getElementById('pv-leave-session')?.addEventListener('click', leaveVenueSession);
+    document.getElementById('pv-hype-boost')?.addEventListener('click', () => submitQuickPulse('boost'));
+    document.getElementById('pv-run-it-back')?.addEventListener('click', () => submitQuickPulse('run_it_back'));
+
+    document.getElementById('pv-scroll-live')?.addEventListener('click', () => {
+      document.getElementById('pv-live-now-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.getElementById('pv-scroll-vote')?.addEventListener('click', () => {
+      document.getElementById('pv-vote-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.getElementById('pv-scroll-social')?.addEventListener('click', () => {
+      document.getElementById('pv-social-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   async function bootVotePage() {
     readParams();
     await loadCore();
@@ -465,6 +684,8 @@ function bindMobileActions() {
     renderHype();
     renderComments();
     renderOtherPulses();
+    renderStandings();
+    renderQuestions();
     bindCommentSubmit();
     bindDjRequestSubmit();
     bindMobileActions();
@@ -481,9 +702,9 @@ function bindMobileActions() {
     const venueId = params.get('venue') || '';
     const promptId = params.get('prompt') || '';
 
- state.roomId = roomId;
-  state.venueId = venueId;
-  state.promptId = promptId;
+    state.roomId = roomId;
+    state.venueId = venueId;
+    state.promptId = promptId;
 
     try {
       const ctx = await loadCheckinContext();
@@ -534,13 +755,6 @@ function bindMobileActions() {
         }
 
         if (!codeRows || !codeRows.length) {
-          console.warn('No matching active code found.', {
-            venueId,
-            roomId,
-            promptId,
-            code,
-            nowIso
-          });
           status.textContent = 'Code is invalid, expired, or for a different venue.';
           return;
         }
