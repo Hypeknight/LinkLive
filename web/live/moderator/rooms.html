@@ -5,122 +5,340 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Moderator Rooms</title>
   <link rel="stylesheet" href="/common/app.css" />
+
   <script src="/common/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/common/supabase.js"></script>
   <script src="/common/db.js"></script>
   <script src="/common/ui.js"></script>
   <script src="/common/auth.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.7/livekit-client.umd.js"></script>
-  <script src="/common/livekit.js"></script>
   <script src="/live/assets/js/moderator.js"></script>
+
+  <style>
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    textarea,
+    input,
+    select {
+      width: 100%;
+    }
+
+    .helper-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    @media (max-width: 980px) {
+      .grid-2,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body data-page="moderator-rooms">
   <div class="shell">
     <aside class="sidebar">
-      <div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Moderator production</div></div></div>
-      <nav class="nav"><a href="/live/moderator/rooms.html" class="active">Rooms</a><a href="/live/moderator/scheduling.html">Scheduling</a></nav>
+      <div class="brand-row">
+        <span class="brand-mark"></span>
+        <div>
+          <div class="brand" data-app-name></div>
+          <div class="sub">Moderator side</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a class="active" href="/live/moderator/rooms.html">Rooms</a>
+        <a href="/live/moderator/scheduling.html">Scheduling</a>
+      </nav>
     </aside>
+
     <main class="main">
-      <header class="header"><div><h1>Room Production Control</h1><p>Create rooms, oversee live feeds, manage pulses, messages, and production state.</p></div><div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline" data-connection-status>Offline</div><button id="logout-button" class="secondary" type="button">Logout</button></div></header>
+      <header class="header">
+        <div>
+          <h1>Rooms</h1>
+          <p>Create rooms, oversee production, launch pulses, and manage live room flow.</p>
+        </div>
+        <div class="header-right">
+          <div id="current-user"></div>
+          <div id="connection-state" class="connection offline" data-connection-status>Offline</div>
+          <button id="logout-button" class="secondary" type="button">Logout</button>
+        </div>
+      </header>
+
       <div id="flash-host"></div>
-      <section class="grid cols-2">
+
+      <section class="grid-2">
         <article class="card">
-          <h3 id="room-form-title">Create Room</h3>
+          <h3 id="room-form-title">Add Room</h3>
           <form id="room-form" class="stack">
-            <label>Title<input name="title" required /></label>
-            <label>Slug<input name="slug" /></label>
-            <label>Timezone / Region<input name="zone" placeholder="America/Chicago" /></label>
-            <label>Capacity<input name="capacity" type="number" min="0" value="5" /></label>
-            <label>Status<select name="status"><option value="scheduled">scheduled</option><option value="live">live</option><option value="completed">completed</option><option value="cancelled">cancelled</option></select></label>
-            <label>Notes<textarea name="notes" rows="4"></textarea></label>
-            <label><input type="checkbox" name="is_active" checked /> Active room</label>
-            <div class="button-row"><button type="submit">Save Room</button><button type="button" id="room-form-reset" class="secondary">Reset</button></div>
+            <label>
+              Room Title
+              <input name="title" required />
+            </label>
+
+            <label>
+              Slug
+              <input name="slug" />
+            </label>
+
+            <label>
+              Zone
+              <input name="zone" />
+            </label>
+
+            <label>
+              Capacity
+              <input type="number" name="capacity" min="0" value="0" />
+            </label>
+
+            <label>
+              Status
+              <select name="status">
+                <option value="scheduled">scheduled</option>
+                <option value="live">live</option>
+                <option value="completed">completed</option>
+                <option value="closed">closed</option>
+              </select>
+            </label>
+
+            <label>
+              Notes
+              <textarea name="notes" rows="4"></textarea>
+            </label>
+
+            <label>
+              <input type="checkbox" name="is_active" checked />
+              Active room
+            </label>
+
+            <div class="button-row">
+              <button type="submit">Save Room</button>
+              <button type="button" class="secondary" id="room-form-reset">Reset</button>
+            </div>
           </form>
         </article>
-        <article class="card"><h3>Rooms</h3><table><thead><tr><th>Title</th><th>Zone</th><th>Status</th><th>Connected</th><th>Live</th><th>Actions</th></tr></thead><tbody id="moderator-rooms-table-body"></tbody></table></article>
+
+        <article class="card">
+          <h3>All Rooms</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Room</th>
+                <th>Zone</th>
+                <th>Status</th>
+                <th>Connected</th>
+                <th>Live Feeds</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="moderator-rooms-table-body"></tbody>
+          </table>
+        </article>
       </section>
-      <section class="card">
-        <h3>Manage Production</h3>
-        <label>Room<select id="manage-room-id"></select></label>
-        <div id="manage-room-summary" class="stats-grid"></div>
-      </section>
-      <section class="grid cols-2">
-        <article class="card"><h3>Connected Venues</h3><table><thead><tr><th>Venue</th><th>Status</th><th>Feed</th><th>Actions</th></tr></thead><tbody id="manage-room-venues"></tbody></table></article>
-        <article class="card"><h3>Pulse Management</h3><div id="manage-room-pulse"></div><form id="pulse-form" class="stack"><input type="hidden" name="room_id" /><label>Prompt<input name="prompt_text" required /></label><label>Type<select name="prompt_type"><option value="vote">vote</option><option value="hype">hype</option><option value="comment">comment</option></select></label><label>Ends At<input type="datetime-local" name="ends_at" /></label><label><input type="checkbox" name="allow_comments" checked /> Allow comments</label><label><input type="checkbox" name="allow_hype" checked /> Allow hype</label><div class="button-row"><button type="submit">Send Pulse</button></div></form></article>
-      </section>
-      <section class="card">
-  <h3>Live Pulse Control</h3>
 
-  <form id="pulse-form" class="stack">
-    <input type="hidden" name="room_id" />
+      <section class="card" style="margin-top:16px;">
+        <h3>Manage Room Production</h3>
 
-    <label>
-      Pulse Prompt
-      <textarea name="prompt_text" rows="3" placeholder="Ex: Which venue won that round?"></textarea>
-    </label>
+        <div class="stack" style="margin-bottom:12px;">
+          <label>
+            Select Room
+            <select id="manage-room-id"></select>
+          </label>
+        </div>
 
-    <label>
-      CTA Type
-      <select name="cta_type">
-        <option value="vote">vote</option>
-        <option value="comment">comment</option>
-        <option value="yell">yell</option>
-      </select>
-    </label>
+        <div class="grid-3">
+          <article class="card">
+            <h4>Room Summary</h4>
+            <div id="manage-room-summary" class="helper-block">
+              <p>Select a room to manage.</p>
+            </div>
+          </article>
 
-    <label>
-      Prompt Type
-      <select name="prompt_type">
-        <option value="battle">battle</option>
-        <option value="energy">energy</option>
-        <option value="crowd_vote">crowd_vote</option>
-        <option value="dj_moment">dj_moment</option>
-        <option value="reaction">reaction</option>
-      </select>
-    </label>
+          <article class="card">
+            <h4>Connected Venues</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Venue</th>
+                  <th>Status</th>
+                  <th>Feed</th>
+                  <th>Joined</th>
+                </tr>
+              </thead>
+              <tbody id="manage-room-venues"></tbody>
+            </table>
+          </article>
 
-    <label>
-      Ends At
-      <input type="datetime-local" name="ends_at" />
-    </label>
+          <article class="card">
+            <h4>Room Messages</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>From</th>
+                  <th>Message</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="manage-room-messages"></tbody>
+            </table>
+          </article>
+        </div>
 
-    <label>
-      Vote Options (comma separated)
-      <input name="option_labels" placeholder="Venue A, Venue B, Run It Back" />
-    </label>
+        <div class="grid-2" style="margin-top:16px;">
+          <article class="card">
+            <h4>Live Pulse Control</h4>
 
-    <label>
-      <input type="checkbox" name="allow_comments" checked />
-      Allow comments
-    </label>
+            <form id="pulse-form" class="stack">
+              <input type="hidden" name="room_id" />
 
-    <label>
-      <input type="checkbox" name="allow_hype" checked />
-      Allow hype
-    </label>
+              <label>
+                Pulse Prompt
+                <textarea name="prompt_text" rows="3" placeholder="Ex: Which venue won that round?"></textarea>
+              </label>
 
-    <label>
-      <input type="checkbox" name="show_results_after_close" />
-      Show results after close
-    </label>
+              <label>
+                CTA Type
+                <select name="cta_type">
+                  <option value="vote">vote</option>
+                  <option value="comment">comment</option>
+                  <option value="yell">yell</option>
+                </select>
+              </label>
 
-    <label>
-      Results Visible Until
-      <input type="datetime-local" name="results_visible_until" />
-    </label>
+              <label>
+                Prompt Type
+                <select name="prompt_type">
+                  <option value="battle">battle</option>
+                  <option value="energy">energy</option>
+                  <option value="crowd_vote">crowd_vote</option>
+                  <option value="dj_moment">dj_moment</option>
+                  <option value="reaction">reaction</option>
+                </select>
+              </label>
 
-    <div class="button-row">
-      <button type="submit">Launch Pulse</button>
-      <button type="button" class="secondary" id="close-live-pulse">Close Live Pulse</button>
-    </div>
-  </form>
+              <label>
+                Ends At
+                <input type="datetime-local" name="ends_at" />
+              </label>
 
-  <div id="manage-room-pulse" class="helper" style="margin-top:12px;"></div>
-</section>
-      <section class="grid cols-2">
-        <article class="card"><h3>Room Messages</h3><form id="moderator-message-form" class="button-row"><input type="hidden" name="room_id" /><input name="body" placeholder="Message connected venues" /><button type="submit">Send</button></form><table><thead><tr><th>From</th><th>Body</th><th>Time</th></tr></thead><tbody id="manage-room-messages"></tbody></table></article>
-        <article class="card"><h3>Production Override</h3><form id="show-state-form" class="stack"><input type="hidden" name="room_id" /><label>Current Segment<input name="current_segment" /></label><label>Current Round<input name="current_round" /></label><label>Event Type<select name="event_type"><option value="rotation">rotation</option><option value="battle">battle</option><option value="freeplay">freeplay</option><option value="stopped">stopped</option></select></label><label>Remaining Seconds<input type="number" name="remaining_seconds" min="0" value="0" /></label><label><input type="checkbox" name="portal_open" /> Portal open</label><label><input type="checkbox" name="timer_running" /> Timer running</label><div class="button-row"><button type="submit">Save State</button><button type="button" id="production-override-stop" class="danger">Hard Stop</button></div></form></article>
+              <label>
+                Vote Options (comma separated)
+                <input name="option_labels" placeholder="Venue A, Venue B, Run It Back" />
+              </label>
+
+              <label>
+                <input type="checkbox" name="allow_comments" checked />
+                Allow comments
+              </label>
+
+              <label>
+                <input type="checkbox" name="allow_hype" checked />
+                Allow hype
+              </label>
+
+              <label>
+                <input type="checkbox" name="show_results_after_close" />
+                Show results after close
+              </label>
+
+              <label>
+                Results Visible Until
+                <input type="datetime-local" name="results_visible_until" />
+              </label>
+
+              <div class="button-row">
+                <button type="submit">Launch Pulse</button>
+                <button type="button" class="secondary" id="close-live-pulse">Close Live Pulse</button>
+              </div>
+            </form>
+
+            <div id="manage-room-pulse" class="helper-block" style="margin-top:12px;"></div>
+          </article>
+
+          <article class="card">
+            <h4>Show State / Phase Control</h4>
+
+            <form id="show-state-form" class="stack">
+              <input type="hidden" name="room_id" />
+
+              <label>
+                Current Segment
+                <input name="current_segment" placeholder="Freestyle, Bottle War, Dance Battle..." />
+              </label>
+
+              <label>
+                Current Round
+                <input name="current_round" placeholder="Round 1, Final Round..." />
+              </label>
+
+              <label>
+                Event Type
+                <input name="event_type" placeholder="battle, freestyle, reaction..." />
+              </label>
+
+              <div class="button-row">
+                <button type="submit">Update Show State</button>
+              </div>
+            </form>
+
+            <hr style="margin:16px 0; border-color: rgba(255,255,255,.08);" />
+
+            <h4>Moderator Message</h4>
+            <form id="room-message-form" class="stack">
+              <input type="hidden" name="room_id" />
+
+              <label>
+                Message to Room
+                <textarea name="body" rows="3" placeholder="Message connected venues..."></textarea>
+              </label>
+
+              <div class="button-row">
+                <button type="submit">Send Message</button>
+              </div>
+            </form>
+          </article>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <h4>Room Schedule Overview</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Segment</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody id="manage-room-schedule"></tbody>
+          </table>
+        </div>
       </section>
     </main>
   </div>
