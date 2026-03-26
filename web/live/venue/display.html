@@ -209,72 +209,63 @@
     </aside>
 
     <main class="main">
-      <header class="header">
-        <div>
-          <h1>Display</h1>
-          <p>Audience-facing room view.</p>
-        </div>
+  <header class="header">
+    <div>
+      <h1>Venue Display</h1>
+      <p>Live room display, venue competition, and pulse participation screen.</p>
+    </div>
+    <div class="header-right">
+      <div id="current-user"></div>
+      <div id="connection-state" class="connection offline" data-connection-status>Offline</div>
+      <button id="logout-button" class="secondary" type="button">Logout</button>
+    </div>
+  </header>
 
-        <div class="header-right">
-          <div id="current-user"></div>
-          <div id="connection-state" class="connection offline" data-connection-status>Offline</div>
-          <button id="logout-button" class="secondary" type="button">Logout</button>
-        </div>
-      </header>
+  <div id="flash-host"></div>
 
-      <div id="flash-host"></div>
+  <section class="grid cols-2" style="align-items:start;">
+    <div>
+      <article class="card">
+        <h3>Other Connected Venues</h3>
+        <div id="display-layout" class="display-grid"></div>
+      </article>
+    </div>
 
-      <section class="display-shell">
-        <div class="display-left">
-          <article class="display-card" style="height:100%;">
-            <h3>Connected Venues</h3>
-            <div
-              id="display-others-grid"
-              class="display-grid display-others-grid"
-              data-count="0"
-            ></div>
-          </article>
-        </div>
+    <div class="stack">
+      <article class="card">
+        <h3>Your Venue Feed</h3>
+        <video id="display-self-preview" autoplay muted playsinline style="width:100%;border-radius:14px;background:#000;"></video>
+      </article>
 
-        <div class="display-right">
-          <div class="display-side-stack">
-            <article class="display-card">
-              <h3>Us Feed</h3>
-              <div id="display-us-feed" class="display-feed-box">
-                <div class="display-feed-label">US</div>
-                <div class="display-placeholder">Waiting for our venue feed…</div>
-              </div>
-            </article>
+      <article class="card">
+        <h3>Room Status</h3>
+        <p><strong>Room:</strong> <span id="display-room-title">No room selected</span></p>
+        <p><strong>Mode:</strong> <span id="display-mode">auto</span></p>
+        <p><strong>Phase:</strong> <span id="display-phase-name">Waiting…</span></p>
+        <p id="display-phase-subtitle" class="helper">No active phase</p>
+      </article>
 
-            <article class="display-card">
-              <h3>Current Phase</h3>
-              <div id="display-phase-name" class="display-phase">Waiting…</div>
-              <div id="display-phase-subtitle" class="display-phase-sub">No active phase</div>
-            </article>
+      <article class="card">
+        <h3>Live Pulse</h3>
+        <div id="display-pulse-prompt" class="helper">No live pulse prompt.</div>
+        <div id="display-pulse-meta" class="helper" style="margin-top:8px;">No active vote</div>
+        <div id="display-pulse-timer" style="font-size:30px;font-weight:800;margin-top:12px;">—</div>
+      </article>
 
-            <article class="display-card">
-              <h3>Current Pulse</h3>
-              <div id="display-pulse-prompt" class="display-pulse-text">No live pulse prompt.</div>
-              <div id="display-pulse-meta" class="display-pulse-meta">Waiting for room prompt…</div>
-              <div id="display-pulse-timer" class="display-timer">—</div>
-            </article>
+      <article class="card">
+        <h3>Vote / Verify</h3>
+        <canvas id="display-vote-qr" style="display:block;margin:0 auto 12px;"></canvas>
+        <div id="display-vote-url" class="display-vote-url">Waiting for vote link…</div>
+        <div id="display-venue-code" class="display-vote-url" style="margin-top:10px;">Venue code loading…</div>
+      </article>
 
-            <article class="display-card">
-              <h3>Vote Live</h3>
-              <div class="display-qr-wrap">
-                <canvas id="display-vote-qr" width="180" height="180"></canvas>
-              </div>
-              <div class="display-vote-url" id="display-vote-url">Waiting for vote link…</div>
-              <div id="display-venue-code" class="display-vote-url">Venue code loading…</div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <div id="display-room-title" style="display:none;"></div>
-      <div id="display-mode" style="display:none;"></div>
-      <div id="display-layout" style="display:none;"></div>
-    </main>
+      <article class="card">
+        <h3>Tonight’s Standings</h3>
+        <div id="display-standings"></div>
+      </article>
+    </div>
+  </section>
+</main>
   </div>
 </body>
 </html>

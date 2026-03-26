@@ -1116,7 +1116,7 @@ async function bootRooms() {
 
   const MAX_VENUES_PER_ROOM = 5;
   let displayTimerHandle = null;
-  
+
   function esc(v) {
     return ui?.esc ? ui.esc(v) : String(v ?? '');
   }
@@ -1145,54 +1145,141 @@ async function bootRooms() {
     return `lk_room_${roomId}`;
   }
 
-async function ensureActiveVenueCode() {
-  if (!state.venue?.id) return null;
+  function roomTitle(roomId) {
+    return state.rooms.find(r => r.id === roomId)?.title || '—';
+  }
 
-  const nowIso = new Date().toISOString();
+  function roomVenueCount(roomId) {
+    return state.memberships.filter(m => m.room_id === roomId && !m.left_at).length;
+  }
 
-  const { data: existing, error: existingError } = await db.client
-    .from('venue_checkin_codes')
-    .select('*')
-    .eq('venue_id', state.venue.id)
-    .eq('is_active', true)
-    .gt('expires_at', nowIso)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  function roomIsFull(roomId) {
+    return roomVenueCount(roomId) >= MAX_VENUES_PER_ROOM;
+  }
 
-  if (existingError) throw existingError;
-  if (existing) return existing;
+  function connectedVenuesInRoom() {
+    if (!state.roomMembership) return [];
+    return state.memberships.filter(m => m.room_id === state.roomMembership.room_id && !m.left_at);
+  }
 
-  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-  const code = randomVenueCode(4);
+  function activeVenueCodeValue() {
+    return state.checkinCode?.code || '----';
+  }
 
-  await db.client
-    .from('venue_checkin_codes')
-    .update({ is_active: false })
-    .eq('venue_id', state.venue.id)
-    .eq('is_active', true);
+  function randomVenueCode(length = 4) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let out = '';
+    for (let i = 0; i < length; i += 1) {
+      out += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return out;
+  }
 
-  const { data: created, error: createError } = await db.client
-    .from('venue_checkin_codes')
-    .insert({
-      venue_id: state.venue.id,
-      room_id: state.roomMembership?.room_id || null,
-      code,
-      starts_at: nowIso,
-      expires_at: expiresAt,
-      is_active: true,
-      created_by: state.profile?.id || null
-    })
-    .select()
-    .single();
+  function displayVoteUrl() {
+    const roomId = state.roomMembership?.room_id || '';
+    const venueId = state.venue?.id || '';
+    const promptId = state.prompt?.id || '';
 
-  if (createError) throw createError;
-  return created;
-}
+    const qs = new URLSearchParams({
+      room: roomId,
+      venue: venueId
+    });
 
-function activeVenueCodeValue() {
-  return state.checkinCode?.code || '----';
-}
+    if (promptId) qs.set('prompt', promptId);
+
+    return `${location.origin}/public/pulse-checkin.html?${qs.toString()}`;
+  }
+
+  function clearDisplayTimer() {
+    if (displayTimerHandle) {
+      clearInterval(displayTimerHandle);
+      displayTimerHandle = null;
+    }
+  }
+
+  function tonightBoundaryMs() {
+    const resetTime = state.venue?.reset_time_local || '08:30:00';
+    const now = new Date();
+    const [h, m, s] = String(resetTime).split(':').map(n => Number(n || 0));
+    const boundary = new Date(now);
+    boundary.setHours(h, m, s || 0, 0);
+    if (now.getTime() < boundary.getTime()) boundary.setDate(boundary.getDate() - 1);
+    return boundary.getTime();
+  }
+
+  function tonightPulseRows() {
+    const boundary = tonightBoundaryMs();
+    return state.pulses.filter(row => new Date(row.created_at).getTime() >= boundary);
+  }
+
+  function computeDisplayStandings() {
+    const rows = tonightPulseRows();
+    const map = new Map();
+
+    rows.forEach(row => {
+      const key = String(row.venue_id || '');
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, {
+          venue_id: key,
+          score: 0,
+          entries: 0
+        });
+      }
+      const item = map.get(key);
+      item.score += Number(row.pulse_score || 0) + Number(row.energy_level || 0);
+      item.entries += 1;
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => b.score - a.score)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
+  }
+
+  async function ensureActiveVenueCode() {
+    if (!state.venue?.id) return null;
+
+    const nowIso = new Date().toISOString();
+
+    const { data: existing, error: existingError } = await db.client
+      .from('venue_checkin_codes')
+      .select('*')
+      .eq('venue_id', state.venue.id)
+      .eq('is_active', true)
+      .gt('expires_at', nowIso)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+    if (existing) return existing;
+
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const code = randomVenueCode(4);
+
+    await db.client
+      .from('venue_checkin_codes')
+      .update({ is_active: false })
+      .eq('venue_id', state.venue.id)
+      .eq('is_active', true);
+
+    const { data: created, error: createError } = await db.client
+      .from('venue_checkin_codes')
+      .insert({
+        venue_id: state.venue.id,
+        room_id: state.roomMembership?.room_id || null,
+        code,
+        starts_at: nowIso,
+        expires_at: expiresAt,
+        is_active: true,
+        created_by: state.profile?.id || null
+      })
+      .select()
+      .single();
+
+    if (createError) throw createError;
+    return created;
+  }
 
   async function loadProfileAndVenue() {
     await auth.requireRole(db.cfg.venueRoles || ['admin', 'moderator', 'ops', 'venue', 'owner']);
@@ -1217,6 +1304,7 @@ function activeVenueCodeValue() {
         .eq('owner_profile_id', state.profile.id)
         .limit(1)
         .maybeSingle();
+
       if (error) throw error;
       venue = data;
     }
@@ -1239,6 +1327,7 @@ function activeVenueCodeValue() {
       .select('*')
       .eq('is_active', true)
       .order('created_at', { ascending: true });
+
     if (error) throw error;
     state.rooms = data || [];
   }
@@ -1249,9 +1338,10 @@ function activeVenueCodeValue() {
       .select('*')
       .is('left_at', null)
       .order('joined_at', { ascending: true });
+
     if (error) throw error;
     state.memberships = data || [];
-    state.roomMembership = state.memberships.find(m => m.venue_id === state.venue.id) || null;
+    state.roomMembership = state.memberships.find(m => String(m.venue_id) === String(state.venue.id)) || null;
   }
 
   async function loadDevices() {
@@ -1260,6 +1350,7 @@ function activeVenueCodeValue() {
       .select('*')
       .eq('venue_id', state.venue.id)
       .order('created_at', { ascending: true });
+
     if (error) throw error;
     state.devices = data || [];
   }
@@ -1293,7 +1384,7 @@ function activeVenueCodeValue() {
         .select('*')
         .eq('room_id', state.roomMembership.room_id)
         .order('created_at', { ascending: false })
-        .limit(50),
+        .limit(150),
 
       db.client
         .from('pulse_prompts')
@@ -1352,18 +1443,6 @@ function activeVenueCodeValue() {
     renderCurrentPage();
   }
 
-  function roomTitle(roomId) {
-    return state.rooms.find(r => r.id === roomId)?.title || '—';
-  }
-
-  function roomVenueCount(roomId) {
-    return state.memberships.filter(m => m.room_id === roomId).length;
-  }
-
-  function roomIsFull(roomId) {
-    return roomVenueCount(roomId) >= MAX_VENUES_PER_ROOM;
-  }
-
   async function joinRoom(roomId) {
     if (state.roomMembership && state.roomMembership.room_id !== roomId) {
       throw new Error('Leave your current room before joining a new one.');
@@ -1379,7 +1458,7 @@ function activeVenueCodeValue() {
       room_id: roomId,
       venue_id: state.venue.id,
       status: 'connected',
-      is_broadcasting: false,
+      is_broadcasting: false
     });
 
     if (error) throw error;
@@ -1400,15 +1479,6 @@ function activeVenueCodeValue() {
     if (error) throw error;
   }
 
-function randomVenueCode(length = 4) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (let i = 0; i < length; i += 1) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
-}
-
   async function updateMembership(payload) {
     if (!state.roomMembership) throw new Error('Join a room first.');
 
@@ -1418,11 +1488,6 @@ function randomVenueCode(length = 4) {
       .eq('id', state.roomMembership.id);
 
     if (error) throw error;
-  }
-
-  function connectedVenuesInRoom() {
-    if (!state.roomMembership) return [];
-    return state.memberships.filter(m => m.room_id === state.roomMembership.room_id);
   }
 
   function renderCurrentPage() {
@@ -1449,7 +1514,6 @@ function randomVenueCode(length = 4) {
         leaveBtn.onclick = async () => {
           try {
             await leaveRoom();
-            await lk.disconnect?.();
             flash('Left room.');
             await refresh();
           } catch (err) {
@@ -1459,453 +1523,371 @@ function randomVenueCode(length = 4) {
       }
     }
 
-    const html = state.rooms.map(room => {
-      const count = roomVenueCount(room.id);
-      const connected = state.roomMembership?.room_id === room.id;
-      const full = roomIsFull(room.id) && !connected;
+    if (table) {
+      table.innerHTML = state.rooms.map(room => {
+        const count = roomVenueCount(room.id);
+        const joined = state.roomMembership?.room_id === room.id;
+        const full = roomIsFull(room.id) && !joined;
 
-      return table
-        ? `<tr>
+        return `
+          <tr>
             <td>${esc(room.title)}</td>
             <td>${esc(room.zone || '—')}</td>
             <td>${esc(room.status || 'scheduled')}</td>
-            <td>${count}/${MAX_VENUES_PER_ROOM}</td>
+            <td>${count}/5</td>
             <td class="actions">
-              ${connected
-                ? `<button type="button" data-leave="${room.id}" class="secondary">Leave Room</button>`
-                : `<button type="button" data-join="${room.id}" ${full ? 'disabled' : ''}>${full ? 'Room Full' : 'Join Room'}</button>`}
+              ${joined
+                ? `<button type="button" class="secondary" data-leave="${room.id}">Leave</button>`
+                : `<button type="button" data-join="${room.id}" ${full ? 'disabled' : ''}>${full ? 'Full' : 'Join Room'}</button>`}
             </td>
-          </tr>`
-        : `<article class="card room-card">
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="5">No rooms available.</td></tr>';
+
+      table.querySelectorAll('[data-join]').forEach(btn => {
+        btn.onclick = async () => {
+          try {
+            await joinRoom(btn.dataset.join);
+            flash('Joined room.');
+            await refresh();
+          } catch (err) {
+            flash(err.message || 'Unable to join room.', 'error');
+          }
+        };
+      });
+
+      table.querySelectorAll('[data-leave]').forEach(btn => {
+        btn.onclick = async () => {
+          try {
+            await leaveRoom();
+            flash('Left room.');
+            await refresh();
+          } catch (err) {
+            flash(err.message || 'Unable to leave room.', 'error');
+          }
+        };
+      });
+    }
+
+    if (grid) {
+      grid.innerHTML = state.rooms.map(room => {
+        const count = roomVenueCount(room.id);
+        const joined = state.roomMembership?.room_id === room.id;
+        const full = roomIsFull(room.id) && !joined;
+
+        return `
+          <article class="card room-card">
             <h3>${esc(room.title)}</h3>
             <div class="helper">Zone: ${esc(room.zone || '—')}</div>
             <div class="helper">Capacity: ${esc(room.capacity ?? '—')}</div>
             <div class="helper">Venues connected: ${count}/${MAX_VENUES_PER_ROOM}</div>
-            <div class="pill ${esc(room.status || 'scheduled')}">${esc(room.status || 'scheduled')}</div>
+            <div class="helper">Status: ${esc(room.status || 'scheduled')}</div>
             <p>${esc(room.notes || '')}</p>
             <div class="button-row">
-              ${connected
-                ? '<button type="button" disabled>Connected</button>'
-                : `<button type="button" data-join="${room.id}" ${full ? 'disabled' : ''}>${full ? 'Room Full' : 'Join Room'}</button>`}
+              ${joined
+                ? `<button type="button" class="secondary" data-grid-leave="${room.id}">Leave Room</button>`
+                : `<button type="button" data-grid-join="${room.id}" ${full ? 'disabled' : ''}>${full ? 'Room Full' : 'Join Room'}</button>`}
             </div>
-          </article>`;
-    }).join('');
+          </article>
+        `;
+      }).join('') || '<p>No rooms are available.</p>';
 
-    if (table) {
-      table.innerHTML = html || `<tr><td colspan="5">No rooms available.</td></tr>`;
+      grid.querySelectorAll('[data-grid-join]').forEach(btn => {
+        btn.onclick = async () => {
+          try {
+            await joinRoom(btn.dataset.gridJoin);
+            flash('Joined room.');
+            await refresh();
+          } catch (err) {
+            flash(err.message || 'Unable to join room.', 'error');
+          }
+        };
+      });
+
+      grid.querySelectorAll('[data-grid-leave]').forEach(btn => {
+        btn.onclick = async () => {
+          try {
+            await leaveRoom();
+            flash('Left room.');
+            await refresh();
+          } catch (err) {
+            flash(err.message || 'Unable to leave room.', 'error');
+          }
+        };
+      });
     }
-
-    if (grid) {
-      grid.innerHTML = html || '<p>No rooms are available.</p>';
-    }
-
-    document.querySelectorAll('[data-join]').forEach(btn => {
-      btn.onclick = async () => {
-        try {
-          await joinRoom(btn.dataset.join);
-          flash('Joined room.');
-          await refresh();
-        } catch (err) {
-          flash(err.message || 'Unable to join room.', 'error');
-        }
-      };
-    });
-
-    document.querySelectorAll('[data-leave]').forEach(btn => {
-      btn.onclick = async () => {
-        try {
-          await leaveRoom();
-          await lk.disconnect?.();
-          flash('Left room.');
-          await refresh();
-        } catch (err) {
-          flash(err.message || 'Unable to leave room.', 'error');
-        }
-      };
-    });
   }
 
   function renderProduction() {
     const roomName = document.getElementById('production-room-name');
-    const roomStatus = document.getElementById('production-room-status');
-    const sched = document.getElementById('production-schedule-list');
-    const schedBody = document.getElementById('production-schedule-body');
-    const venues = document.getElementById('production-venues-list');
-    const connectedVenues = document.getElementById('production-connected-venues');
-    const messages = document.getElementById('production-message-list');
-    const pulse = document.getElementById('production-pulse-card');
-    const feedStatus = document.getElementById('production-feed-status');
+    const roomStatus = document.getElementById('production-room-status') || document.getElementById('production-feed-status');
+    const scheduleList = document.getElementById('production-schedule-list') || document.getElementById('production-schedule-body');
+    const venuesList = document.getElementById('production-venues-list') || document.getElementById('production-connected-venues');
+    const messagesList = document.getElementById('production-message-list');
+    const pulseCard = document.getElementById('production-pulse-card');
 
     if (roomName) roomName.textContent = state.roomMembership ? roomTitle(state.roomMembership.room_id) : 'No room selected';
     if (roomStatus) roomStatus.textContent = state.roomMembership ? (state.roomMembership.is_broadcasting ? 'Broadcasting' : 'Connected / feed idle') : 'Not connected';
-    if (feedStatus) feedStatus.textContent = state.roomMembership ? (state.roomMembership.is_broadcasting ? 'Live' : 'Stopped') : 'Not connected';
 
-    const scheduleHtml = state.schedules.map(s =>
-      `<tr><td>${esc(s.segment_title)}</td><td>${fmt(s.starts_at)}</td><td>${fmt(s.end_at)}</td><td>${esc(s.segment_type || 'segment')}</td></tr>`
-    ).join('') || '<tr><td colspan="4">No schedule loaded.</td></tr>';
-
-    if (sched) sched.innerHTML = scheduleHtml;
-    if (schedBody) schedBody.innerHTML = scheduleHtml;
-
-    const venueHtml = connectedVenuesInRoom().map(v =>
-      `<tr><td>${esc(v.venue_id)}</td><td>${esc(v.status || 'connected')}</td><td>${v.is_broadcasting ? 'Live' : 'Idle'}</td></tr>`
-    ).join('') || '<tr><td colspan="3">No venues connected.</td></tr>';
-
-    if (venues) venues.innerHTML = venueHtml;
-
-    if (connectedVenues) {
-      connectedVenues.innerHTML = connectedVenuesInRoom().length
-        ? connectedVenuesInRoom().map(v => `<li>${esc(String(v.venue_id))}</li>`).join('')
-        : '<li>No connected venues.</li>';
+    if (scheduleList) {
+      const rows = state.schedules.map(s => `
+        <tr>
+          <td>${esc(s.segment_title || s.title || 'Segment')}</td>
+          <td>${fmt(s.starts_at || s.start_at)}</td>
+          <td>${fmt(s.end_at)}</td>
+          <td>${esc(s.segment_type || s.status || 'segment')}</td>
+        </tr>
+      `).join('');
+      scheduleList.innerHTML = rows || '<tr><td colspan="4">No schedule loaded.</td></tr>';
     }
 
-    if (messages) {
-      messages.innerHTML = state.messages.map(m =>
-        `<tr><td>${esc(m.from_role)}</td><td>${esc(m.body)}</td><td>${fmt(m.created_at)}</td></tr>`
-      ).join('') || '<tr><td colspan="3">No messages.</td></tr>';
+    if (venuesList) {
+      const members = connectedVenuesInRoom();
+      if (venuesList.tagName === 'UL') {
+        venuesList.innerHTML = members.length
+          ? members.map(v => `<li>${esc(String(v.venue_id))} • ${v.is_broadcasting ? 'Live' : 'Idle'}</li>`).join('')
+          : '<li>No connected venues.</li>';
+      } else {
+        venuesList.innerHTML = members.length
+          ? members.map(v => `
+              <tr>
+                <td>${esc(String(v.venue_id))}</td>
+                <td>${esc(v.status || 'connected')}</td>
+                <td>${v.is_broadcasting ? 'Live' : 'Idle'}</td>
+              </tr>
+            `).join('')
+          : '<tr><td colspan="3">No connected venues.</td></tr>';
+      }
     }
 
-    if (pulse) {
-      pulse.innerHTML = state.prompt
-        ? `<h4>${esc(state.prompt.prompt_text)}</h4><p>Status: ${esc(state.prompt.status)}</p><p>Ends: ${fmt(state.prompt.ends_at)}</p>`
+    if (messagesList) {
+      messagesList.innerHTML = state.messages.length
+        ? state.messages.map(m => `
+            <tr>
+              <td>${esc(m.from_role || 'system')}</td>
+              <td>${esc(m.body || '')}</td>
+              <td>${fmt(m.created_at)}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="3">No messages.</td></tr>';
+    }
+
+    if (pulseCard) {
+      pulseCard.innerHTML = state.prompt
+        ? `
+          <h4>${esc(state.prompt.prompt_text)}</h4>
+          <p>CTA: ${esc(state.prompt.cta_type || 'vote')}</p>
+          <p>Status: ${esc(state.prompt.status || 'live')}</p>
+          <p>Ends: ${fmt(state.prompt.ends_at)}</p>
+        `
         : '<p>No live pulse prompt.</p>';
     }
   }
 
+  function attachDisplayTrack(track, participant) {
+    const othersGrid = document.getElementById('display-others-grid') || document.getElementById('display-layout');
+    if (!othersGrid || track.kind !== 'video') return;
 
-  function displayParticipantIdentity(venueId) {
-  return `venue_${venueId}`;
-}
+    if (String(participant.identity || '').includes(`venue_${currentVenueId()}`)) {
+      return;
+    }
 
-function displayVoteUrl() {
-  const roomId = state.roomMembership?.room_id || '';
-  const venueId = state.venue?.id || '';
-  const promptId = state.prompt?.id || '';
-  const qs = new URLSearchParams({
-    room: roomId,
-    venue: venueId,
-  });
-  if (promptId) qs.set('prompt', promptId);
-  return `${location.origin}/public/pulse-checkin.html?${qs.toString()}`;
-}
+    let box = othersGrid.querySelector(`[data-participant="${participant.identity}"]`);
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'display-feed-box';
+      box.dataset.participant = participant.identity;
+      othersGrid.appendChild(box);
+    }
 
-function clearDisplayTimer() {
-  if (displayTimerHandle) {
-    clearInterval(displayTimerHandle);
-    displayTimerHandle = null;
-  }
-}
-
-function formatSeconds(total) {
-  const safe = Math.max(0, Number(total || 0));
-  const mins = Math.floor(safe / 60);
-  const secs = safe % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-function startDisplayTimer() {
-  clearDisplayTimer();
-
-  const timerEl = document.getElementById('display-pulse-timer');
-  if (!timerEl) return;
-
-  if (state.prompt?.ends_at) {
-    const tick = () => {
-      const remaining = Math.max(
-        0,
-        Math.floor((new Date(state.prompt.ends_at).getTime() - Date.now()) / 1000)
-      );
-      timerEl.textContent = formatSeconds(remaining);
-      if (remaining <= 0) clearDisplayTimer();
-    };
-    tick();
-    displayTimerHandle = setInterval(tick, 1000);
-    return;
-  }
-
-  if (state.showState?.timer_running && Number.isFinite(Number(state.showState?.remaining_seconds))) {
-    let remaining = Number(state.showState.remaining_seconds);
-    timerEl.textContent = formatSeconds(remaining);
-    displayTimerHandle = setInterval(() => {
-      remaining = Math.max(0, remaining - 1);
-      timerEl.textContent = formatSeconds(remaining);
-      if (remaining <= 0) clearDisplayTimer();
-    }, 1000);
-    return;
-  }
-
-  timerEl.textContent = '—';
-}
-
-function buildDisplayPlaceholder(identity, labelText) {
-  const wrap = document.createElement('div');
-  wrap.className = 'display-feed-box';
-  wrap.dataset.participant = identity;
-
-  const label = document.createElement('div');
-  label.className = 'display-feed-label';
-  label.textContent = labelText;
-
-  const placeholder = document.createElement('div');
-  placeholder.className = 'display-placeholder';
-  placeholder.textContent = 'Waiting for live feed…';
-
-  wrap.appendChild(label);
-  wrap.appendChild(placeholder);
-  return wrap;
-}
-
-function ensureDisplayPlaceholders() {
-  const othersGrid = document.getElementById('display-others-grid');
-  const usHost = document.getElementById('display-us-feed');
-  if (!othersGrid || !usHost) return;
-
-  const roomMembers = connectedVenuesInRoom();
-  const usIdentity = displayParticipantIdentity(state.venue.id);
-  const otherMembers = roomMembers.filter(v => v.venue_id !== state.venue.id).slice(0, 4);
-
-  if (!usHost.querySelector(`[data-participant="${usIdentity}"]`)) {
-    usHost.innerHTML = '';
-    usHost.appendChild(buildDisplayPlaceholder(usIdentity, 'US'));
-  }
-
-  othersGrid.innerHTML = '';
-  otherMembers.forEach((member, index) => {
-    const identity = displayParticipantIdentity(member.venue_id);
-    const card = buildDisplayPlaceholder(identity, `Venue ${index + 1}`);
-    othersGrid.appendChild(card);
-  });
-
-  othersGrid.dataset.count = String(Math.max(otherMembers.length, 1));
-
-  if (!otherMembers.length) {
-    const empty = document.createElement('div');
-    empty.className = 'display-feed-box';
-    empty.innerHTML = `<div class="display-placeholder">No other venues are connected in this room yet.</div>`;
-    othersGrid.appendChild(empty);
-  }
-}
-
-function renderDisplayInfo() {
-  const roomTitleEl = document.getElementById('display-room-title');
-  const modeEl = document.getElementById('display-mode');
-  const phaseNameEl = document.getElementById('display-phase-name');
-  const phaseSubEl = document.getElementById('display-phase-subtitle');
-  const pulsePromptEl = document.getElementById('display-pulse-prompt');
-  const pulseMetaEl = document.getElementById('display-pulse-meta');
-  const voteUrlEl = document.getElementById('display-vote-url');
-  const qrCanvas = document.getElementById('display-vote-qr');
-  const venueCodeEl = document.getElementById('display-venue-code');
-  if (venueCodeEl) {
-  venueCodeEl.innerHTML = `<strong>Venue Code:</strong> ${activeVenueCodeValue()}`;
-  }
-
-  if (roomTitleEl) {
-    roomTitleEl.textContent = state.roomMembership ? roomTitle(state.roomMembership.room_id) : 'No room selected';
-  }
-
-  if (modeEl) {
-    modeEl.textContent = state.showState?.event_type || 'auto';
-  }
-
-  const phaseName =
-    state.showState?.event_type ||
-    state.showState?.current_segment ||
-    state.schedules[0]?.segment_title ||
-    'Waiting…';
-
-  const phaseSub =
-    state.showState?.current_round
-      ? `Current round: ${state.showState.current_round}`
-      : (state.schedules[0]?.segment_type || 'No active phase');
-
-  if (phaseNameEl) phaseNameEl.textContent = phaseName;
-  if (phaseSubEl) phaseSubEl.textContent = phaseSub;
-
-  if (pulsePromptEl) {
-    pulsePromptEl.textContent = state.prompt?.prompt_text || 'No live pulse prompt.';
-  }
-
-  if (pulseMetaEl) {
-    const type = state.prompt?.prompt_type || 'No active vote';
-    const status = state.prompt?.status || 'idle';
-    pulseMetaEl.textContent = `${type} • ${status}`;
-  }
-
-  const voteUrl = displayVoteUrl();
-  if (voteUrlEl) {
-  voteUrlEl.innerHTML = `
-    <div><strong>Scan to verify and vote live</strong></div>
-    <div style="margin-top:6px; font-size:12px; opacity:.8;">
-      Guests must verify they are at the venue before voting, commenting, or sending DJ requests.
-    </div>
-    <div style="margin-top:8px; font-size:12px; opacity:.7; word-break:break-word;">
-      ${voteUrl}
-    </div>
-  `;
-}
-
-  if (qrCanvas && window.QRious) {
-    new window.QRious({
-      element: qrCanvas,
-      value: voteUrl,
-      size: 180,
-      level: 'H'
-    });
-  }
-
-  startDisplayTimer();
-  ensureDisplayPlaceholders();
-}
-
-function attachDisplayTrack(track, participant) {
-  const usIdentity = displayParticipantIdentity(state.venue.id);
-  const isUs = participant.identity === usIdentity;
-
-  const host = isUs
-    ? document.getElementById('display-us-feed')
-    : document.querySelector(`[data-participant="${participant.identity}"]`);
-
-  if (!host) return;
-
-  const existingVideo = host.querySelector('video');
-  const existingAudio = host.querySelector('audio');
-
-  if (track.kind === 'video') {
-    if (existingVideo) return;
-
-    host.innerHTML = '';
+    box.innerHTML = '';
 
     const label = document.createElement('div');
     label.className = 'display-feed-label';
-    label.textContent = isUs ? 'US' : (participant.name || participant.identity);
+    label.textContent = participant.name || participant.identity;
 
     const video = document.createElement('video');
     video.autoplay = true;
     video.playsInline = true;
-    video.muted = false;
+    video.muted = true;
 
     track.attach(video);
 
-    host.appendChild(label);
-    host.appendChild(video);
+    box.appendChild(label);
+    box.appendChild(video);
   }
 
-  if (track.kind === 'audio') {
-    if (existingAudio) return;
+  function renderDisplayInfo() {
+    const roomTitleEl = document.getElementById('display-room-title');
+    const modeEl = document.getElementById('display-mode');
+    const phaseNameEl = document.getElementById('display-phase-name');
+    const phaseSubEl = document.getElementById('display-phase-subtitle');
+    const pulsePromptEl = document.getElementById('display-pulse-prompt');
+    const pulseMetaEl = document.getElementById('display-pulse-meta');
+    const voteUrlEl = document.getElementById('display-vote-url');
+    const venueCodeEl = document.getElementById('display-venue-code');
+    const qrCanvas = document.getElementById('display-vote-qr');
+    const timerEl = document.getElementById('display-pulse-timer');
+    const standingsEl = document.getElementById('display-standings');
 
-    const audio = document.createElement('audio');
-    audio.autoplay = true;
-    audio.playsInline = true;
-    audio.style.display = 'none';
+    if (roomTitleEl) {
+      roomTitleEl.textContent = state.roomMembership ? roomTitle(state.roomMembership.room_id) : 'No room selected';
+    }
 
-    track.attach(audio);
-    host.appendChild(audio);
+    if (modeEl) {
+      modeEl.textContent = state.showState?.event_type || 'auto';
+    }
+
+    const phaseName =
+      state.showState?.event_type ||
+      state.showState?.current_segment ||
+      state.schedules[0]?.segment_title ||
+      'Waiting…';
+
+    const phaseSub =
+      state.showState?.current_round
+        ? `Current round: ${state.showState.current_round}`
+        : (state.schedules[0]?.segment_type || 'No active phase');
+
+    if (phaseNameEl) phaseNameEl.textContent = phaseName;
+    if (phaseSubEl) phaseSubEl.textContent = phaseSub;
+
+    const livePrompt = state.prompt && state.prompt.status === 'live'
+      && (!state.prompt.ends_at || new Date(state.prompt.ends_at).getTime() > Date.now())
+      ? state.prompt
+      : null;
+
+    if (pulsePromptEl) {
+      pulsePromptEl.textContent = livePrompt?.prompt_text || 'No live pulse prompt.';
+    }
+
+    if (pulseMetaEl) {
+      const type = livePrompt?.cta_type || livePrompt?.prompt_type || 'No active pulse';
+      const status = livePrompt?.status || 'idle';
+      pulseMetaEl.textContent = `${type} • ${status}`;
+    }
+
+    clearDisplayTimer();
+    if (timerEl) {
+      const renderTime = () => {
+        if (livePrompt?.ends_at) {
+          const secs = Math.max(0, Math.floor((new Date(livePrompt.ends_at).getTime() - Date.now()) / 1000));
+          timerEl.textContent = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
+        } else {
+          timerEl.textContent = '—';
+        }
+      };
+      renderTime();
+      if (livePrompt?.ends_at) {
+        displayTimerHandle = setInterval(renderTime, 1000);
+      }
+    }
+
+    const voteUrl = displayVoteUrl();
+    if (voteUrlEl) {
+      voteUrlEl.innerHTML = `
+        <div><strong>Scan to verify and participate</strong></div>
+        <div style="margin-top:6px;font-size:12px;opacity:.8;word-break:break-word;">${esc(voteUrl)}</div>
+      `;
+    }
+
+    if (venueCodeEl) {
+      venueCodeEl.innerHTML = `<strong>Venue Code:</strong> ${esc(activeVenueCodeValue())}`;
+    }
+
+    if (qrCanvas && window.QRious) {
+      new window.QRious({
+        element: qrCanvas,
+        value: voteUrl,
+        size: 180,
+        level: 'H'
+      });
+    }
+
+    if (standingsEl) {
+      const standings = computeDisplayStandings();
+      standingsEl.innerHTML = standings.length
+        ? standings.map(item => `
+            <div class="feed-item">
+              <div><strong>#${item.rank}</strong> ${esc(item.venue_id === String(state.venue?.id) ? (state.venue?.name || 'Your Venue') : item.venue_id)}</div>
+              <div class="feed-time">${item.score} pts • ${item.entries} tonight</div>
+            </div>
+          `).join('')
+        : `<div class="feed-item">Standings will appear as the room interacts tonight.</div>`;
+    }
   }
-}
-
 
   function renderDisplay() {
     renderDisplayInfo();
   }
 
   function renderPulse() {
-  const prompt = document.getElementById('venue-pulse-prompt');
-  const promptMeta = document.getElementById('venue-pulse-prompt-meta');
-  const timerEl = document.getElementById('venue-pulse-timer');
-  const metrics = document.getElementById('venue-pulse-metrics');
-  const entries = document.getElementById('venue-pulse-table');
-  const qr = document.getElementById('venue-pulse-qr');
-  const qrCanvas = document.getElementById('venue-pulse-qr-canvas');
-  const pulseCodeEl = document.getElementById('venue-pulse-code');
-  if (pulseCodeEl) {
-  pulseCodeEl.innerHTML = `<strong>Venue Code:</strong> ${activeVenueCodeValue()}`;
-  }
+    const prompt = document.getElementById('venue-pulse-prompt');
+    const metrics = document.getElementById('venue-pulse-metrics');
+    const entries = document.getElementById('venue-pulse-table');
+    const qr = document.getElementById('venue-pulse-qr');
+    const qrCanvas = document.getElementById('venue-pulse-qr-canvas');
+    const codeEl = document.getElementById('venue-pulse-code');
 
-  if (prompt) {
-    prompt.textContent = state.prompt?.prompt_text || 'No pulse prompt is currently live.';
-  }
+    if (prompt) {
+      prompt.innerHTML = state.prompt
+        ? `<h3>${esc(state.prompt.prompt_text)}</h3><p>${esc(state.prompt.cta_type || state.prompt.prompt_type || 'vote')}</p><p>Ends ${fmt(state.prompt.ends_at)}</p>`
+        : '<p>No live pulse prompt is currently active.</p>';
+    }
 
-  if (promptMeta) {
-    const type = state.prompt?.prompt_type || 'No active vote';
-    const status = state.prompt?.status || 'idle';
-    promptMeta.textContent = `${type} • ${status}`;
-  }
+    const roomPulse = state.pulses.filter(p => p.room_id === state.roomMembership?.room_id);
+    const avg = roomPulse.length ? Math.round(roomPulse.reduce((a, b) => a + Number(b.pulse_score || 0), 0) / roomPulse.length) : 0;
+    const hype = roomPulse.length ? Math.round(roomPulse.reduce((a, b) => a + Number(b.energy_level || 0), 0) / roomPulse.length) : 0;
 
-  const roomPulse = state.pulses.filter(p => p.room_id === state.roomMembership?.room_id);
-  const avg = roomPulse.length
-    ? Math.round(roomPulse.reduce((a, b) => a + Number(b.pulse_score || 0), 0) / roomPulse.length)
-    : 0;
-  const hype = roomPulse.length
-    ? Math.round(roomPulse.reduce((a, b) => a + Number(b.energy_level || 0), 0) / roomPulse.length)
-    : 0;
+    if (metrics) {
+      metrics.innerHTML = `
+        <div class="stat-box"><strong>${avg}%</strong><span>Pulse Score</span></div>
+        <div class="stat-box"><strong>${hype}</strong><span>Hype Meter</span></div>
+        <div class="stat-box"><strong>${roomPulse.length}</strong><span>Entries</span></div>
+      `;
+    }
 
-  if (metrics) {
-    metrics.innerHTML = `
-      <div class="pulse-stat">
-        <strong>${avg}%</strong>
-        <span>Pulse Score</span>
-      </div>
-      <div class="pulse-stat">
-        <strong>${hype}</strong>
-        <span>Hype Meter</span>
-      </div>
-      <div class="pulse-stat">
-        <strong>${roomPulse.length}</strong>
-        <span>Entries</span>
-      </div>
-    `;
-  }
+    if (entries) {
+      entries.innerHTML = roomPulse.length
+        ? roomPulse.map(p => `
+            <tr>
+              <td>${fmt(p.created_at)}</td>
+              <td>${esc(p.pulse_score)}</td>
+              <td>${esc(p.energy_level)}</td>
+              <td>${esc(p.crowd_count)}</td>
+              <td>${esc(p.notes || '—')}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="5">No pulse entries yet.</td></tr>';
+    }
 
-  if (entries) {
-    entries.innerHTML = roomPulse.map(p => `
-      <tr>
-        <td>${fmt(p.created_at)}</td>
-        <td>${esc(p.pulse_score)}</td>
-        <td>${esc(p.energy_level)}</td>
-        <td>${esc(p.crowd_count)}</td>
-        <td>${esc(p.notes || '—')}</td>
-      </tr>
-    `).join('') || '<tr><td colspan="5">No pulse entries yet.</td></tr>';
-  }
+    const voteUrl = `${location.origin}/public/pulse-checkin.html?room=${encodeURIComponent(state.roomMembership?.room_id || '')}&venue=${encodeURIComponent(state.venue?.id || '')}${state.prompt?.id ? `&prompt=${encodeURIComponent(state.prompt.id)}` : ''}`;
 
-  const voteUrl = `${location.origin}/public/pulse-vote.html?room=${encodeURIComponent(state.roomMembership?.room_id || '')}&venue=${encodeURIComponent(state.venue?.id || '')}${state.prompt?.id ? `&prompt=${encodeURIComponent(state.prompt.id)}` : ''}`;
+    if (qr) {
+      qr.textContent = voteUrl;
+    }
 
-  if (qr) {
-    qr.textContent = voteUrl;
-  }
+    if (codeEl) {
+      codeEl.innerHTML = `<strong>Venue Code:</strong> ${esc(activeVenueCodeValue())}`;
+    }
 
-  if (qrCanvas && window.QRious) {
-    new window.QRious({
-      element: qrCanvas,
-      value: voteUrl,
-      size: 220,
-      level: 'H'
-    });
-  }
-
-  if (timerEl) {
-    if (state.prompt?.ends_at) {
-      const remaining = Math.max(
-        0,
-        Math.floor((new Date(state.prompt.ends_at).getTime() - Date.now()) / 1000)
-      );
-      timerEl.textContent = formatSeconds(remaining);
-    } else if (state.showState?.timer_running && Number.isFinite(Number(state.showState?.remaining_seconds))) {
-      timerEl.textContent = formatSeconds(Number(state.showState.remaining_seconds));
-    } else {
-      timerEl.textContent = '—';
+    if (qrCanvas && window.QRious) {
+      new window.QRious({
+        element: qrCanvas,
+        value: voteUrl,
+        size: 220,
+        level: 'H'
+      });
     }
   }
-}
 
   function renderLocalControls() {
     const cams = document.getElementById('local-camera-device');
     const mics = document.getElementById('local-mic-device');
     const preferredCam = document.getElementById('local-preferred-camera');
     const preferredMic = document.getElementById('local-preferred-mic');
-    const roomText = document.getElementById('local-current-room');
     const table = document.getElementById('local-devices-table');
+    const roomText = document.getElementById('local-current-room');
 
     if (roomText) roomText.textContent = state.roomMembership ? roomTitle(state.roomMembership.room_id) : 'No room joined';
     if (!table) return;
@@ -1913,12 +1895,31 @@ function attachDisplayTrack(track, participant) {
     const camDevices = state.devices.filter(d => d.type === 'camera');
     const micDevices = state.devices.filter(d => d.type === 'microphone');
 
-    const opts = rows => ui.option('', 'Select') + rows.map(d => ui.option(d.input_id || d.id, d.name || d.input_id || d.id)).join('');
+    const opts = rows =>
+      (ui.option ? ui.option('', 'Select') : '<option value="">Select</option>') +
+      rows.map(d => ui.option
+        ? ui.option(d.input_id || d.id, d.name || d.input_id || d.id)
+        : `<option value="${esc(d.input_id || d.id)}">${esc(d.name || d.input_id || d.id)}</option>`
+      ).join('');
 
     if (cams) cams.innerHTML = opts(camDevices);
     if (mics) mics.innerHTML = opts(micDevices);
-    if (preferredCam) preferredCam.innerHTML = ui.option('', 'No default') + camDevices.map(d => ui.option(d.id, d.name || d.input_id || d.id, !!d.is_default)).join('');
-    if (preferredMic) preferredMic.innerHTML = ui.option('', 'No default') + micDevices.map(d => ui.option(d.id, d.name || d.input_id || d.id, !!d.is_default)).join('');
+    if (preferredCam) {
+      preferredCam.innerHTML =
+        (ui.option ? ui.option('', 'No default') : '<option value="">No default</option>') +
+        camDevices.map(d => ui.option
+          ? ui.option(d.id, d.name || d.input_id || d.id, !!d.is_default)
+          : `<option value="${esc(d.id)}">${esc(d.name || d.input_id || d.id)}</option>`
+        ).join('');
+    }
+    if (preferredMic) {
+      preferredMic.innerHTML =
+        (ui.option ? ui.option('', 'No default') : '<option value="">No default</option>') +
+        micDevices.map(d => ui.option
+          ? ui.option(d.id, d.name || d.input_id || d.id, !!d.is_default)
+          : `<option value="${esc(d.id)}">${esc(d.name || d.input_id || d.id)}</option>`
+        ).join('');
+    }
 
     table.innerHTML = state.devices.map(d => `
       <tr>
@@ -1934,28 +1935,32 @@ function attachDisplayTrack(track, participant) {
       </tr>
     `).join('') || '<tr><td colspan="6">No saved devices.</td></tr>';
 
-    table.querySelectorAll('[data-toggle]').forEach(btn => btn.onclick = async () => {
-      try {
-        const device = state.devices.find(d => d.id === btn.dataset.toggle);
-        const next = device?.status === 'offline' ? 'online' : 'offline';
-        const { error } = await db.client.from('devices').update({ status: next }).eq('id', btn.dataset.toggle);
-        if (error) throw error;
-        flash(`Device ${next === 'online' ? 'enabled' : 'disabled'}.`);
-        await refresh();
-      } catch (err) {
-        flash(err.message || 'Device update failed.', 'error');
-      }
+    table.querySelectorAll('[data-toggle]').forEach(btn => {
+      btn.onclick = async () => {
+        try {
+          const device = state.devices.find(d => d.id === btn.dataset.toggle);
+          const next = device?.status === 'offline' ? 'online' : 'offline';
+          const { error } = await db.client.from('devices').update({ status: next }).eq('id', btn.dataset.toggle);
+          if (error) throw error;
+          flash(`Device ${next === 'online' ? 'enabled' : 'disabled'}.`);
+          await refresh();
+        } catch (err) {
+          flash(err.message || 'Device update failed.', 'error');
+        }
+      };
     });
 
-    table.querySelectorAll('[data-remove]').forEach(btn => btn.onclick = async () => {
-      try {
-        const { error } = await db.client.from('devices').delete().eq('id', btn.dataset.remove);
-        if (error) throw error;
-        flash('Device removed.');
-        await refresh();
-      } catch (err) {
-        flash(err.message || 'Device remove failed.', 'error');
-      }
+    table.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.onclick = async () => {
+        try {
+          const { error } = await db.client.from('devices').delete().eq('id', btn.dataset.remove);
+          if (error) throw error;
+          flash('Device removed.');
+          await refresh();
+        } catch (err) {
+          flash(err.message || 'Device remove failed.', 'error');
+        }
+      };
     });
   }
 
@@ -1967,8 +1972,17 @@ function attachDisplayTrack(track, participant) {
     const camSel = document.getElementById('local-camera-device');
     const micSel = document.getElementById('local-mic-device');
 
-    if (camSel) camSel.innerHTML = ui.option('', 'Select camera') + cams.map((d, i) => ui.option(d.deviceId, d.label || `Camera ${i + 1}`)).join('');
-    if (micSel) micSel.innerHTML = ui.option('', 'Select microphone') + mics.map((d, i) => ui.option(d.deviceId, d.label || `Microphone ${i + 1}`)).join('');
+    if (camSel) {
+      camSel.innerHTML =
+        (ui.option ? ui.option('', 'Select camera') : '<option value="">Select camera</option>') +
+        cams.map((d, i) => ui.option ? ui.option(d.deviceId, d.label || `Camera ${i + 1}`) : `<option value="${esc(d.deviceId)}">${esc(d.label || `Camera ${i + 1}`)}</option>`).join('');
+    }
+
+    if (micSel) {
+      micSel.innerHTML =
+        (ui.option ? ui.option('', 'Select microphone') : '<option value="">Select microphone</option>') +
+        mics.map((d, i) => ui.option ? ui.option(d.deviceId, d.label || `Microphone ${i + 1}`) : `<option value="${esc(d.deviceId)}">${esc(d.label || `Microphone ${i + 1}`)}</option>`).join('');
+    }
   }
 
   async function saveSelectedLocalDevices() {
@@ -2000,7 +2014,7 @@ function attachDisplayTrack(track, participant) {
       });
     }
 
-    if (!rows.length) return flash('Choose a camera and/or microphone first.', 'error');
+    if (!rows.length) throw new Error('Choose a camera and/or microphone first.');
 
     const { error } = await db.client.from('devices').upsert(rows, { onConflict: 'venue_id,input_id' });
     if (error) throw error;
@@ -2018,7 +2032,7 @@ function attachDisplayTrack(track, participant) {
       preferred_camera_id: preferredCam?.value || null,
       preferred_audio_input_id: preferredMic?.value || null,
       preferred_audio_interface_id: null,
-      updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }, { onConflict: 'venue_id' });
 
     if (error) throw error;
@@ -2037,7 +2051,7 @@ function attachDisplayTrack(track, participant) {
 
     state.localStream = await navigator.mediaDevices.getUserMedia({
       video: camSel?.value ? { deviceId: { exact: camSel.value } } : true,
-      audio: micSel?.value ? { deviceId: { exact: micSel.value } } : true,
+      audio: micSel?.value ? { deviceId: { exact: micSel.value } } : true
     });
 
     video.srcObject = state.localStream;
@@ -2068,16 +2082,7 @@ function attachDisplayTrack(track, participant) {
       startBtn.onclick = async () => {
         try {
           if (!currentRoomId()) throw new Error('Join a room first.');
-
           if (!lk) throw new Error('LiveKit helper is not available.');
-
-          const cameraId = state.devices.find(d => d.id === (document.getElementById('local-preferred-camera')?.value || null))?.input_id
-            || state.devices.find(d => d.id === state.profile?.preferred_camera_id)?.input_id
-            || null;
-
-          const micId = state.devices.find(d => d.id === (document.getElementById('local-preferred-mic')?.value || null))?.input_id
-            || state.devices.find(d => d.id === state.profile?.preferred_audio_input_id)?.input_id
-            || null;
 
           await lk.connect({
             roomName: livekitRoomName(currentRoomId()),
@@ -2087,9 +2092,14 @@ function attachDisplayTrack(track, participant) {
             canSubscribe: true
           });
 
+          const preferredCameraId =
+            state.devices.find(d => d.is_default && d.type === 'camera')?.input_id || null;
+          const preferredMicId =
+            state.devices.find(d => d.is_default && d.type === 'microphone')?.input_id || null;
+
           await lk.createAndPublishLocalTracks({
-            videoDeviceId: cameraId,
-            audioDeviceId: micId
+            videoDeviceId: preferredCameraId,
+            audioDeviceId: preferredMicId
           });
 
           if (preview) lk.attachLocalPreview(preview);
@@ -2106,7 +2116,7 @@ function attachDisplayTrack(track, participant) {
     if (stopBtn) {
       stopBtn.onclick = async () => {
         try {
-          await lk.disconnect?.();
+          await lk?.disconnect?.();
           await updateMembership({ is_broadcasting: false, status: 'connected' });
           flash('Feed stopped.');
           await refresh();
@@ -2119,55 +2129,74 @@ function attachDisplayTrack(track, participant) {
     renderProduction();
   }
 
-async function bootDisplay() {
-  const host = document.getElementById('display-video-host');
-  const othersGrid = document.getElementById('display-others-grid');
-  const usHost = document.getElementById('display-us-feed');
+  async function bootDisplay() {
+    const othersGrid = document.getElementById('display-others-grid') || document.getElementById('display-layout');
+    const usHost = document.getElementById('display-us-feed');
 
-  renderDisplayInfo();
+    renderDisplayInfo();
 
-  if (!currentRoomId()) {
-    if (othersGrid) {
-      othersGrid.innerHTML = `<div class="display-feed-box"><div class="display-placeholder">Join a room to use the display.</div></div>`;
+    if (!currentRoomId()) {
+      if (othersGrid) {
+        othersGrid.innerHTML = `<div class="display-feed-box"><div class="display-placeholder">Join a room to use the display.</div></div>`;
+      }
+      if (usHost) {
+        usHost.innerHTML = `<div class="display-feed-label">US</div><div class="display-placeholder">No room joined.</div>`;
+      }
+      return;
     }
-    if (usHost) {
-      usHost.innerHTML = `<div class="display-feed-label">US</div><div class="display-placeholder">No room joined.</div>`;
-    }
-    return;
-  }
 
-  if (!lk) throw new Error('LiveKit client library is not loaded.');
+    if (!lk) throw new Error('LiveKit client library is not loaded.');
 
-  await lk.connect({
-    roomName: livekitRoomName(currentRoomId()),
-    identity: `display_${currentVenueId()}`,
-    participantName: `Display ${currentVenueId()}`,
-    canPublish: false,
-    canSubscribe: true
-  });
-
-  lk.onTrackSubscribed(({ track, participant }) => {
-    attachDisplayTrack(track, participant);
-  });
-
-  lk.onTrackUnsubscribed(({ track, participant }) => {
-    const target = document.querySelector(`[data-participant="${participant.identity}"]`);
-    if (target && track.kind === 'video') {
-      target.innerHTML = `<div class="display-feed-label">${participant.name || participant.identity}</div><div class="display-placeholder">Feed disconnected.</div>`;
-    }
-  });
-
-  const room = lk.getRoom();
-  room.remoteParticipants.forEach((participant) => {
-    participant.trackPublications.forEach((pub) => {
-      if (pub.track) attachDisplayTrack(pub.track, participant);
+    await lk.connect({
+      roomName: livekitRoomName(currentRoomId()),
+      identity: `display_${currentVenueId()}`,
+      participantName: `Display ${currentVenueId()}`,
+      canPublish: false,
+      canSubscribe: true
     });
-  });
 
-  window.addEventListener('beforeunload', () => {
-    clearDisplayTimer();
-  });
-}
+    lk.onTrackSubscribed(({ track, participant }) => {
+      attachDisplayTrack(track, participant);
+    });
+
+    lk.onTrackUnsubscribed(({ track, participant }) => {
+      const target = document.querySelector(`[data-participant="${participant.identity}"]`);
+      if (target && track.kind === 'video') {
+        target.innerHTML = `<div class="display-feed-label">${esc(participant.name || participant.identity)}</div><div class="display-placeholder">Feed disconnected.</div>`;
+      }
+    });
+
+    const room = lk.getRoom?.();
+    if (room?.remoteParticipants) {
+      room.remoteParticipants.forEach((participant) => {
+        participant.trackPublications.forEach((pub) => {
+          if (pub.track) attachDisplayTrack(pub.track, participant);
+        });
+      });
+    }
+
+    if (usHost) {
+      if (state.localStream) {
+        usHost.innerHTML = '';
+        const label = document.createElement('div');
+        label.className = 'display-feed-label';
+        label.textContent = 'US';
+
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = true;
+        video.srcObject = state.localStream;
+
+        usHost.appendChild(label);
+        usHost.appendChild(video);
+      } else {
+        usHost.innerHTML = `<div class="display-feed-label">US</div><div class="display-placeholder">Open production on this device to preview your local feed.</div>`;
+      }
+    }
+
+    window.addEventListener('beforeunload', clearDisplayTimer);
+  }
 
   async function bootPulse() {
     renderPulse();
@@ -2189,19 +2218,21 @@ async function bootDisplay() {
           flash('Camera and microphone access granted.');
           await discoverBrowserDevices();
         } catch (err) {
-          flash(err.message || 'Permission denied', 'error');
+          flash(err.message || 'Permission denied.', 'error');
         }
       };
     }
 
     if (discoverBtn) discoverBtn.onclick = discoverBrowserDevices;
-    if (saveBtn) saveBtn.onclick = async () => {
-      try {
-        await saveSelectedLocalDevices();
-      } catch (err) {
-        flash(err.message || 'Could not save local devices.', 'error');
-      }
-    };
+    if (saveBtn) {
+      saveBtn.onclick = async () => {
+        try {
+          await saveSelectedLocalDevices();
+        } catch (err) {
+          flash(err.message || 'Could not save local devices.', 'error');
+        }
+      };
+    }
 
     if (saveDefaultsBtn) {
       saveDefaultsBtn.onclick = async () => {
@@ -2225,15 +2256,10 @@ async function bootDisplay() {
 
     if (stopPreviewBtn) stopPreviewBtn.onclick = stopPreview;
 
-    document.getElementById('logout-button')?.addEventListener('click', async () => {
-      await auth.signOut();
-    });
-
-    await discoverBrowserDevices();
     renderLocalControls();
   }
 
-  async function bindCommonActions() {
+  async function bindVenueActions() {
     document.getElementById('logout-button')?.addEventListener('click', async () => {
       await auth.signOut();
     });
@@ -2248,7 +2274,7 @@ async function bootDisplay() {
           venue_id: state.venue.id,
           profile_id: state.profile.id,
           from_role: 'venue',
-          body: input.value.trim(),
+          body: input.value.trim()
         });
 
         if (error) throw error;
@@ -2267,25 +2293,20 @@ async function bootDisplay() {
       setConnection(false, 'Connecting');
       await loadProfileAndVenue();
       await refresh();
-      await bindCommonActions();
-
-      const page = document.body.dataset.page;
-      const boots = {
-        'venue-rooms': bootRooms,
-        'venue-production': bootProduction,
-        'venue-display': bootDisplay,
-        'venue-pulse': bootPulse,
-        'venue-local-controls': bootLocalControls
-      };
-
-      if (boots[page]) {
-        await boots[page]();
-      }
-
+      await bindVenueActions();
       setConnection(true, 'Connected');
 
-      ['rooms', 'room_venues', 'devices', 'schedules', 'patron_pulse', 'pulse_prompts', 'show_state', 'production_messages']
-        .forEach(t => db.subscribe(t, refresh));
+      [
+        'rooms',
+        'room_venues',
+        'devices',
+        'schedules',
+        'patron_pulse',
+        'pulse_prompts',
+        'show_state',
+        'production_messages',
+        'venue_checkin_codes'
+      ].forEach(t => db.subscribe(t, refresh));
     } catch (err) {
       console.error(err);
       setConnection(false, 'Error');
@@ -2293,5 +2314,10 @@ async function bootDisplay() {
     }
   }
 
-  document.addEventListener('DOMContentLoaded', boot);
+  document.addEventListener('DOMContentLoaded', () => {
+    boot().catch(err => {
+      console.error(err);
+      flash(err.message || 'Venue page failed to load', 'error');
+    });
+  });
 })();

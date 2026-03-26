@@ -27,18 +27,12 @@
     if (ui?.flash) ui.flash(msg, type);
   }
 
-  function setConnection(ok, label) {
-    if (ui?.setConnection) ui.setConnection(ok, label);
-  }
-
   async function loadProfile() {
     await auth.requireRole(db.cfg.moderatorRoles || ['admin', 'moderator', 'ops']);
     state.profile = await auth.getProfile();
 
     const currentUser = document.getElementById('current-user');
-    if (currentUser) {
-      currentUser.textContent = state.profile?.display_name || state.profile?.email || '';
-    }
+    if (currentUser) currentUser.textContent = state.profile?.display_name || state.profile?.email || '';
 
     document.querySelectorAll('[data-app-name]').forEach(el => {
       el.textContent = 'Linkd’N Live';
@@ -57,9 +51,9 @@
       venuesRes
     ] = await Promise.all([
       db.client.from('rooms').select('*').order('created_at', { ascending: true }),
-      db.client.from('room_venues').select('*').is('left_at', null).order('joined_at', { ascending: true }),
+      db.client.from('room_venues').select('*').order('joined_at', { ascending: true }),
       db.client.from('schedules').select('*').order('starts_at', { ascending: true }),
-      db.client.from('patron_pulse').select('*').order('created_at', { ascending: false }).limit(200),
+      db.client.from('patron_pulse').select('*').order('created_at', { ascending: false }).limit(300),
       db.client.from('pulse_prompts').select('*').order('created_at', { ascending: false }).limit(200),
       db.client.from('show_state').select('*'),
       db.client.from('production_messages').select('*').order('created_at', { ascending: false }).limit(200),
@@ -87,7 +81,7 @@
   }
 
   function roomMemberships(roomId) {
-    return state.memberships.filter(m => m.room_id === roomId);
+    return state.memberships.filter(m => m.room_id === roomId && !m.left_at);
   }
 
   function roomSchedule(roomId) {
@@ -114,10 +108,6 @@
     return state.venues.find(v => String(v.id) === String(venueId))?.name || String(venueId || '—');
   }
 
-  function timezoneHint(room) {
-    return room?.zone || 'Local venue time';
-  }
-
   function avgPulseForRoom(roomId) {
     const rows = roomPulses(roomId);
     return rows.length
@@ -130,6 +120,17 @@
     return rows.length
       ? Math.round(rows.reduce((a, b) => a + Number(b.energy_level || 0), 0) / rows.length)
       : 0;
+  }
+
+  function parsePulseOptions(raw) {
+    return String(raw || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map((label, idx) => ({
+        id: String(idx + 1),
+        option_text: label
+      }));
   }
 
   function bindLogout() {
@@ -185,12 +186,12 @@
 
         form.dataset.editingId = room.id;
         form.title.value = room.title || '';
-        form.slug.value = room.slug || '';
+        if (form.slug) form.slug.value = room.slug || '';
         form.zone.value = room.zone || '';
         form.capacity.value = room.capacity || 0;
         form.status.value = room.status || 'scheduled';
-        form.notes.value = room.notes || '';
-        form.is_active.checked = !!room.is_active;
+        if (form.notes) form.notes.value = room.notes || '';
+        if (form.is_active) form.is_active.checked = !!room.is_active;
 
         const titleEl = document.getElementById('room-form-title');
         if (titleEl) titleEl.textContent = 'Edit Room';
@@ -258,125 +259,91 @@
     const show = roomShowState(roomId);
 
     if (summary) {
-      summary.innerHTML = room ? `
-        <div class="stat-box"><strong>${esc(room.title)}</strong><span>Room</span></div>
-        <div class="stat-box"><strong>${members.length}/5</strong><span>Connected Venues</span></div>
-        <div class="stat-box"><strong>${members.filter(m => m.is_broadcasting).length}</strong><span>Live Feeds</span></div>
-        <div class="stat-box"><strong>${avgPulse}%</strong><span>Pulse Score</span></div>
-        <div class="stat-box"><strong>${avgEnergy}</strong><span>Hype Meter</span></div>
-        <div class="stat-box"><strong>${esc(show?.event_type || '—')}</strong><span>Current Phase</span></div>
-      ` : '<p>Select a room to manage production.</p>';
+      summary.innerHTML = room
+        ? `
+          <div><strong>Room:</strong> ${esc(room.title)}</div>
+          <div><strong>Status:</strong> ${esc(room.status || 'scheduled')}</div>
+          <div><strong>Zone:</strong> ${esc(room.zone || '—')}</div>
+          <div><strong>Capacity:</strong> ${esc(room.capacity || 0)}</div>
+          <div><strong>Tonight Avg Pulse:</strong> ${avgPulse}%</div>
+          <div><strong>Tonight Avg Energy:</strong> ${avgEnergy}%</div>
+          <div><strong>Current Phase:</strong> ${esc(show?.event_type || show?.current_segment || '—')}</div>
+        `
+        : '<p>Select a room to manage.</p>';
     }
 
     if (venuesBody) {
-      venuesBody.innerHTML = members.map(m => `
-        <tr>
-          <td>${esc(venueName(m.venue_id))}</td>
-          <td>${esc(m.status || 'connected')}</td>
-          <td>${m.is_broadcasting ? 'Live' : 'Idle'}</td>
-          <td class="actions">
-            <button type="button" data-toggle-feed="${m.id}">
-              ${m.is_broadcasting ? 'Stop Feed' : 'Start Feed'}
-            </button>
-            <button type="button" class="danger" data-kick-venue="${m.id}">Disconnect</button>
-          </td>
-        </tr>
-      `).join('') || '<tr><td colspan="4">No connected venues.</td></tr>';
-
-      venuesBody.querySelectorAll('[data-toggle-feed]').forEach(btn => {
-        btn.onclick = async () => {
-          try {
-            const member = members.find(m => m.id === btn.dataset.toggleFeed);
-            if (!member) return;
-
-            const { error } = await db.client
-              .from('room_venues')
-              .update({
-                is_broadcasting: !member.is_broadcasting,
-                status: member.is_broadcasting ? 'connected' : 'live',
-              })
-              .eq('id', btn.dataset.toggleFeed);
-
-            if (error) throw error;
-            flash('Feed state updated.');
-            await refreshAll();
-          } catch (err) {
-            flash(err.message || 'Unable to update feed state.', 'error');
-          }
-        };
-      });
-
-      venuesBody.querySelectorAll('[data-kick-venue]').forEach(btn => {
-        btn.onclick = async () => {
-          if (!confirm('Disconnect this venue from the room?')) return;
-          try {
-            const { error } = await db.client
-              .from('room_venues')
-              .update({
-                left_at: new Date().toISOString(),
-                status: 'removed',
-                is_broadcasting: false
-              })
-              .eq('id', btn.dataset.kickVenue);
-
-            if (error) throw error;
-            flash('Venue disconnected.');
-            await refreshAll();
-          } catch (err) {
-            flash(err.message || 'Unable to disconnect venue.', 'error');
-          }
-        };
-      });
+      venuesBody.innerHTML = members.length
+        ? members.map(m => `
+            <tr>
+              <td>${esc(venueName(m.venue_id))}</td>
+              <td>${esc(m.status || 'connected')}</td>
+              <td>${m.is_broadcasting ? 'Live' : 'Idle'}</td>
+              <td>${fmt(m.joined_at)}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="4">No connected venues.</td></tr>';
     }
 
     if (pulseBox) {
       pulseBox.innerHTML = prompt
         ? `
-          <h4>${esc(prompt.prompt_text)}</h4>
-          <p>Type: ${esc(prompt.prompt_type || 'vote')}</p>
-          <p>Status: ${esc(prompt.status || 'live')}</p>
-          <p>Ends: ${fmt(prompt.ends_at)}</p>
-          <p>Entries: ${roomPulseEntries.length}</p>
+          <div><strong>Prompt:</strong> ${esc(prompt.prompt_text)}</div>
+          <div><strong>CTA:</strong> ${esc(prompt.cta_type || 'vote')}</div>
+          <div><strong>Type:</strong> ${esc(prompt.prompt_type || 'pulse')}</div>
+          <div><strong>Status:</strong> ${esc(prompt.status || 'live')}</div>
+          <div><strong>Ends:</strong> ${fmt(prompt.ends_at)}</div>
+          <div><strong>Show Results:</strong> ${prompt.show_results_after_close ? 'Yes' : 'No'}</div>
+          <div><strong>Responses Tonight:</strong> ${roomPulseEntries.length}</div>
         `
         : '<p>No live pulse prompt for this room.</p>';
     }
 
     if (msgBody) {
-      msgBody.innerHTML = roomMessages(roomId).map(m => `
-        <tr>
-          <td>${esc(m.from_role)}</td>
-          <td>${esc(m.body)}</td>
-          <td>${fmt(m.created_at)}</td>
-        </tr>
-      `).join('') || '<tr><td colspan="3">No room messages.</td></tr>';
+      const msgs = roomMessages(roomId);
+      msgBody.innerHTML = msgs.length
+        ? msgs.map(m => `
+            <tr>
+              <td>${esc(m.from_role || 'system')}</td>
+              <td>${esc(m.body || '')}</td>
+              <td>${fmt(m.created_at)}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="3">No room messages.</td></tr>';
     }
 
     if (scheduleBody) {
-      scheduleBody.innerHTML = roomSchedule(roomId).map(s => `
-        <tr>
-          <td>${esc(s.segment_title)}</td>
-          <td>${esc(s.segment_type || 'segment')}</td>
-          <td>${fmt(s.starts_at)}</td>
-          <td>${fmt(s.end_at)}</td>
-        </tr>
-      `).join('') || '<tr><td colspan="4">No room schedule yet.</td></tr>';
+      const items = roomSchedule(roomId);
+      scheduleBody.innerHTML = items.length
+        ? items.map(s => `
+            <tr>
+              <td>${esc(s.segment_title || s.title || 'Segment')}</td>
+              <td>${fmt(s.starts_at || s.start_at)}</td>
+              <td>${fmt(s.end_at)}</td>
+              <td>${esc(s.segment_type || s.status || 'segment')}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="4">No schedule for this room.</td></tr>';
     }
 
     const pulseForm = document.getElementById('pulse-form');
-    const msgForm = document.getElementById('moderator-message-form');
-    const showForm = document.getElementById('show-state-form');
+    if (pulseForm && pulseForm.room_id) {
+      pulseForm.room_id.value = roomId || '';
+    }
 
-    if (pulseForm) pulseForm.room_id.value = roomId || '';
-    if (msgForm) msgForm.room_id.value = roomId || '';
+    const messageForm = document.getElementById('room-message-form');
+    if (messageForm && messageForm.room_id) {
+      messageForm.room_id.value = roomId || '';
+    }
 
-    if (showForm) {
-      showForm.room_id.value = roomId || '';
-      showForm.current_segment.value = show?.current_segment || '';
-      showForm.current_round.value = show?.current_round || '';
-      showForm.event_type.value = show?.event_type || 'rotation';
-      showForm.remaining_seconds.value = show?.remaining_seconds ?? 0;
-      showForm.portal_open.checked = !!show?.portal_open;
-      showForm.timer_running.checked = !!show?.timer_running;
+    const showStateForm = document.getElementById('show-state-form');
+    if (showStateForm && showStateForm.room_id) {
+      showStateForm.room_id.value = roomId || '';
+      if (show) {
+        if (showStateForm.current_segment) showStateForm.current_segment.value = show.current_segment || '';
+        if (showStateForm.current_round) showStateForm.current_round.value = show.current_round || '';
+        if (showStateForm.event_type) showStateForm.event_type.value = show.event_type || '';
+      }
     }
   }
 
@@ -391,13 +358,13 @@
 
       const payload = {
         title: form.title.value.trim(),
-        slug: form.slug.value.trim() || null,
+        slug: form.slug ? (form.slug.value.trim() || null) : null,
         zone: form.zone.value.trim() || null,
         capacity: Number(form.capacity.value || 0),
         status: form.status.value,
-        notes: form.notes.value.trim() || null,
-        is_active: !!form.is_active.checked,
-        created_by: state.profile.id,
+        notes: form.notes ? (form.notes.value.trim() || null) : null,
+        is_active: form.is_active ? !!form.is_active.checked : true,
+        created_by: state.profile?.id || null
       };
 
       try {
@@ -414,8 +381,7 @@
         form.reset();
         form.dataset.editingId = '';
         const titleEl = document.getElementById('room-form-title');
-        if (titleEl) titleEl.textContent = 'Create Room';
-
+        if (titleEl) titleEl.textContent = 'Add Room';
         await refreshAll();
       } catch (err) {
         flash(err.message || 'Unable to save room.', 'error');
@@ -426,7 +392,7 @@
       form.reset();
       form.dataset.editingId = '';
       const titleEl = document.getElementById('room-form-title');
-      if (titleEl) titleEl.textContent = 'Create Room';
+      if (titleEl) titleEl.textContent = 'Add Room';
     });
   }
 
@@ -440,49 +406,64 @@
       e.preventDefault();
 
       try {
+        const optionSet = parsePulseOptions(form.option_labels?.value || '');
+
         const payload = {
           room_id: form.room_id.value,
           created_by: state.profile.id,
           prompt_text: form.prompt_text.value.trim(),
           prompt_type: form.prompt_type.value,
+          cta_type: form.cta_type.value,
           status: 'live',
-          allow_comments: !!form.allow_comments.checked,
-          allow_votes: true,
-          allow_hype: !!form.allow_hype.checked,
-          ends_at: form.ends_at.value ? new Date(form.ends_at.value).toISOString() : null,
+          allow_comments: !!form.allow_comments?.checked,
+          allow_votes: form.cta_type.value === 'vote',
+          allow_hype: !!form.allow_hype?.checked,
+          show_results_after_close: !!form.show_results_after_close?.checked,
+          results_visible_until: form.results_visible_until?.value
+            ? new Date(form.results_visible_until.value).toISOString()
+            : null,
+          ends_at: form.ends_at?.value
+            ? new Date(form.ends_at.value).toISOString()
+            : null,
+          option_set_json: optionSet
         };
 
         const { error } = await db.client.from('pulse_prompts').insert(payload);
         if (error) throw error;
 
-        flash('Pulse prompt sent to room.');
+        flash('Live pulse launched.');
         form.reset();
         await refreshAll();
       } catch (err) {
-        flash(err.message || 'Unable to create pulse prompt.', 'error');
+        flash(err.message || 'Unable to launch pulse.', 'error');
       }
     });
 
     document.getElementById('close-live-pulse')?.addEventListener('click', async () => {
-      const roomId = form.room_id.value;
+      const roomId = form.room_id?.value;
       if (!roomId) {
         flash('Select a room first.', 'error');
         return;
       }
 
       try {
-        const livePrompt = roomPrompt(roomId);
-        if (!livePrompt) {
+        const prompt = roomPrompt(roomId);
+        if (!prompt) {
           flash('No live pulse prompt for this room.', 'error');
           return;
         }
 
         const { error } = await db.client
           .from('pulse_prompts')
-          .update({ status: 'closed' })
-          .eq('id', livePrompt.id);
+          .update({
+            status: 'closed',
+            closed_at: new Date().toISOString(),
+            closed_by: state.profile.id
+          })
+          .eq('id', prompt.id);
 
         if (error) throw error;
+
         flash('Live pulse closed.');
         await refreshAll();
       } catch (err) {
@@ -492,7 +473,7 @@
   }
 
   function bindMessageForm() {
-    const form = document.getElementById('moderator-message-form');
+    const form = document.getElementById('room-message-form');
     if (!form || form.dataset.bound) return;
 
     form.dataset.bound = '1';
@@ -501,18 +482,19 @@
       e.preventDefault();
 
       try {
-        const { error } = await db.client.from('production_messages').insert({
+        const payload = {
           room_id: form.room_id.value,
           profile_id: state.profile.id,
           venue_id: null,
           from_role: 'moderator',
-          body: form.body.value.trim(),
-        });
+          body: form.body.value.trim()
+        };
 
+        const { error } = await db.client.from('production_messages').insert(payload);
         if (error) throw error;
 
-        flash('Message sent to room.');
-        form.reset();
+        form.body.value = '';
+        flash('Message sent.');
         await refreshAll();
       } catch (err) {
         flash(err.message || 'Unable to send message.', 'error');
@@ -532,182 +514,168 @@
       try {
         const payload = {
           room_id: form.room_id.value,
-          current_segment: form.current_segment.value.trim() || null,
-          current_round: form.current_round.value.trim() || null,
-          portal_open: !!form.portal_open.checked,
-          timer_running: !!form.timer_running.checked,
-          remaining_seconds: Number(form.remaining_seconds.value || 0),
-          event_type: form.event_type.value,
-          updated_at: new Date().toISOString(),
+          current_segment: form.current_segment?.value?.trim() || null,
+          current_round: form.current_round?.value?.trim() || null,
+          event_type: form.event_type?.value?.trim() || null,
+          updated_at: new Date().toISOString()
         };
 
-        const { error } = await db.client
-          .from('show_state')
-          .upsert(payload, { onConflict: 'room_id' });
-
+        const { error } = await db.client.from('show_state').upsert(payload, { onConflict: 'room_id' });
         if (error) throw error;
 
-        flash('Production state updated.');
+        flash('Show state updated.');
         await refreshAll();
       } catch (err) {
-        flash(err.message || 'Unable to update production state.', 'error');
-      }
-    });
-
-    document.getElementById('production-override-stop')?.addEventListener('click', async () => {
-      try {
-        const roomId = form.room_id.value;
-        if (!roomId) {
-          flash('Select a room first.', 'error');
-          return;
-        }
-
-        const { error: stateError } = await db.client
-          .from('show_state')
-          .upsert({
-            room_id: roomId,
-            portal_open: false,
-            timer_running: false,
-            event_type: 'stopped',
-            current_segment: 'Override Stop',
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'room_id' });
-
-        if (stateError) throw stateError;
-
-        const { error: memberError } = await db.client
-          .from('room_venues')
-          .update({
-            is_broadcasting: false,
-            status: 'connected'
-          })
-          .eq('room_id', roomId)
-          .is('left_at', null);
-
-        if (memberError) throw memberError;
-
-        flash('Production override applied. All feeds stopped.');
-        await refreshAll();
-      } catch (err) {
-        flash(err.message || 'Unable to apply override.', 'error');
+        flash(err.message || 'Unable to update show state.', 'error');
       }
     });
   }
 
   function renderSchedulingPage() {
     renderScheduleTable();
+    renderScheduleRoomSelect();
     bindScheduleForm();
   }
 
   function renderScheduleTable() {
-    const tbody = document.getElementById('schedule-table-body');
+    const tbody = document.getElementById('moderator-schedule-table-body');
     if (!tbody) return;
 
     tbody.innerHTML = state.schedules.map(s => `
       <tr>
         <td>${esc(roomTitle(s.room_id))}</td>
-        <td>${esc(s.segment_title)}</td>
-        <td>${esc(s.segment_type || 'segment')}</td>
-        <td>${fmt(s.starts_at)}</td>
+        <td>${esc(s.segment_title || s.title || 'Segment')}</td>
+        <td>${fmt(s.starts_at || s.start_at)}</td>
         <td>${fmt(s.end_at)}</td>
-        <td>${esc(timezoneHint(state.rooms.find(r => r.id === s.room_id) || {}))}</td>
+        <td>${esc(s.segment_type || s.status || 'segment')}</td>
         <td class="actions">
           <button type="button" data-edit-schedule="${s.id}">Edit</button>
           <button type="button" class="danger" data-delete-schedule="${s.id}">Delete</button>
         </td>
       </tr>
-    `).join('') || '<tr><td colspan="7">No schedule segments found.</td></tr>';
+    `).join('') || '<tr><td colspan="6">No schedule items found.</td></tr>';
 
     tbody.querySelectorAll('[data-edit-schedule]').forEach(btn => {
       btn.onclick = () => {
-        const row = state.schedules.find(s => s.id === btn.dataset.editSchedule);
+        const item = state.schedules.find(s => s.id === btn.dataset.editSchedule);
         const form = document.getElementById('schedule-form');
-        if (!row || !form) return;
+        if (!item || !form) return;
 
-        form.dataset.editingId = row.id;
-        form.room_id.value = row.room_id || '';
-        form.segment_title.value = row.segment_title || '';
-        form.segment_type.value = row.segment_type || 'segment';
-        form.description.value = row.description || '';
-        form.starts_at.value = row.starts_at ? new Date(row.starts_at).toISOString().slice(0, 16) : '';
-        form.end_at.value = row.end_at ? new Date(row.end_at).toISOString().slice(0, 16) : '';
-        form.sort_order.value = row.sort_order ?? 0;
-        form.lead_name.value = row.lead_name || '';
+        form.dataset.editingId = item.id;
+        if (form.room_id) form.room_id.value = item.room_id || '';
+        if (form.segment_title) form.segment_title.value = item.segment_title || item.title || '';
+        if (form.segment_type) form.segment_type.value = item.segment_type || '';
+        if (form.description) form.description.value = item.description || '';
+        if (form.lead_name) form.lead_name.value = item.lead_name || '';
+        if (form.starts_at) form.starts_at.value = item.starts_at ? new Date(item.starts_at).toISOString().slice(0, 16) : '';
+        if (form.end_at) form.end_at.value = item.end_at ? new Date(item.end_at).toISOString().slice(0, 16) : '';
 
         const titleEl = document.getElementById('schedule-form-title');
-        if (titleEl) titleEl.textContent = 'Edit Schedule Segment';
+        if (titleEl) titleEl.textContent = 'Edit Schedule Item';
       };
     });
 
     tbody.querySelectorAll('[data-delete-schedule]').forEach(btn => {
       btn.onclick = async () => {
-        if (!confirm('Delete this schedule segment?')) return;
+        if (!confirm('Delete this schedule item?')) return;
         try {
           const { error } = await db.client.from('schedules').delete().eq('id', btn.dataset.deleteSchedule);
           if (error) throw error;
-          flash('Schedule segment deleted.');
+          flash('Schedule item deleted.');
           await refreshAll();
         } catch (err) {
-          flash(err.message || 'Unable to delete schedule segment.', 'error');
+          flash(err.message || 'Unable to delete schedule item.', 'error');
         }
       };
     });
   }
 
-  function bindScheduleForm() {
-    const form = document.getElementById('schedule-form');
-    const roomSelect = document.getElementById('schedule-room-id');
-    if (!form) return;
+  function renderScheduleRoomSelect() {
+    const select = document.getElementById('schedule-room-filter');
+    const roomSelect = document.querySelector('#schedule-form [name="room_id"]');
 
-    if (roomSelect) {
-      roomSelect.innerHTML =
-        (ui.option ? ui.option('', 'Select room') : '<option value="">Select room</option>') +
-        state.rooms.map(r =>
-          ui.option
-            ? ui.option(r.id, `${r.title} (${r.zone || 'Local'})`)
-            : `<option value="${esc(r.id)}">${esc(r.title)}</option>`
+    if (select) {
+      const current = select.value;
+      select.innerHTML =
+        (ui.option ? ui.option('', 'All rooms') : '<option value="">All rooms</option>') +
+        state.rooms.map(r => ui.option
+          ? ui.option(r.id, r.title, r.id === current)
+          : `<option value="${esc(r.id)}">${esc(r.title)}</option>`
         ).join('');
+
+      if (!select.dataset.bound) {
+        select.dataset.bound = '1';
+        select.addEventListener('change', () => {
+          const roomId = select.value;
+          const tbody = document.getElementById('moderator-schedule-table-body');
+          if (!tbody) return;
+
+          const rows = roomId ? state.schedules.filter(s => s.room_id === roomId) : state.schedules;
+          tbody.innerHTML = rows.map(s => `
+            <tr>
+              <td>${esc(roomTitle(s.room_id))}</td>
+              <td>${esc(s.segment_title || s.title || 'Segment')}</td>
+              <td>${fmt(s.starts_at || s.start_at)}</td>
+              <td>${fmt(s.end_at)}</td>
+              <td>${esc(s.segment_type || s.status || 'segment')}</td>
+              <td class="actions">
+                <button type="button" data-edit-schedule="${s.id}">Edit</button>
+                <button type="button" class="danger" data-delete-schedule="${s.id}">Delete</button>
+              </td>
+            </tr>
+          `).join('') || '<tr><td colspan="6">No schedule items found.</td></tr>';
+        });
+      }
     }
 
-    if (form.dataset.bound) return;
+    if (roomSelect) {
+      const current = roomSelect.value;
+      roomSelect.innerHTML =
+        (ui.option ? ui.option('', 'Select room') : '<option value="">Select room</option>') +
+        state.rooms.map(r => ui.option
+          ? ui.option(r.id, r.title, r.id === current)
+          : `<option value="${esc(r.id)}">${esc(r.title)}</option>`
+        ).join('');
+    }
+  }
+
+  function bindScheduleForm() {
+    const form = document.getElementById('schedule-form');
+    if (!form || form.dataset.bound) return;
+
     form.dataset.bound = '1';
 
     form.addEventListener('submit', async e => {
       e.preventDefault();
 
       try {
-        const selectedRoom = state.rooms.find(r => r.id === form.room_id.value);
-
         const payload = {
-          room_id: form.room_id.value,
-          segment_title: form.segment_title.value.trim(),
-          segment_type: form.segment_type.value,
-          description: form.description.value.trim() || null,
-          starts_at: form.starts_at.value ? new Date(form.starts_at.value).toISOString() : null,
-          end_at: form.end_at.value ? new Date(form.end_at.value).toISOString() : null,
-          sort_order: Number(form.sort_order.value || 0),
-          lead_name: form.lead_name.value.trim() || null,
-          venue_id: selectedRoom?.venue_id || null,
+          room_id: form.room_id.value || null,
+          segment_title: form.segment_title?.value?.trim() || null,
+          segment_type: form.segment_type?.value?.trim() || null,
+          description: form.description?.value?.trim() || null,
+          lead_name: form.lead_name?.value?.trim() || null,
+          starts_at: form.starts_at?.value ? new Date(form.starts_at.value).toISOString() : null,
+          end_at: form.end_at?.value ? new Date(form.end_at.value).toISOString() : null
         };
 
         if (form.dataset.editingId) {
           const { error } = await db.client.from('schedules').update(payload).eq('id', form.dataset.editingId);
           if (error) throw error;
-          flash('Schedule segment updated.');
+          flash('Schedule item updated.');
         } else {
           const { error } = await db.client.from('schedules').insert(payload);
           if (error) throw error;
-          flash('Schedule segment created.');
+          flash('Schedule item created.');
         }
 
         form.reset();
         form.dataset.editingId = '';
         const titleEl = document.getElementById('schedule-form-title');
-        if (titleEl) titleEl.textContent = 'Create Schedule Segment';
-
+        if (titleEl) titleEl.textContent = 'Add Schedule Item';
         await refreshAll();
       } catch (err) {
-        flash(err.message || 'Unable to save schedule segment.', 'error');
+        flash(err.message || 'Unable to save schedule item.', 'error');
       }
     });
 
@@ -715,33 +683,38 @@
       form.reset();
       form.dataset.editingId = '';
       const titleEl = document.getElementById('schedule-form-title');
-      if (titleEl) titleEl.textContent = 'Create Schedule Segment';
-    });
-
-    document.querySelectorAll('[data-quick-segment]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        form.segment_title.value = btn.dataset.quickSegment;
-        form.segment_type.value = btn.dataset.segmentType || 'segment';
-      });
+      if (titleEl) titleEl.textContent = 'Add Schedule Item';
     });
   }
 
   async function boot() {
     try {
-      setConnection(false, 'Connecting');
       await loadProfile();
       bindLogout();
+      ui?.setConnection?.(true, 'Connected');
       await refreshAll();
-      setConnection(true, 'Connected');
 
-      ['rooms', 'room_venues', 'schedules', 'patron_pulse', 'pulse_prompts', 'show_state', 'production_messages']
-        .forEach(t => db.subscribe(t, refreshAll));
+      [
+        'rooms',
+        'room_venues',
+        'schedules',
+        'patron_pulse',
+        'pulse_prompts',
+        'show_state',
+        'production_messages',
+        'venues'
+      ].forEach(t => db.subscribe(t, refreshAll));
     } catch (err) {
       console.error(err);
-      setConnection(false, 'Error');
-      flash(err.message || 'Moderator live pages failed to load.', 'error');
+      ui?.setConnection?.(false, 'Error');
+      flash(err.message || 'Moderator page failed to load.', 'error');
     }
   }
 
-  document.addEventListener('DOMContentLoaded', boot);
+  document.addEventListener('DOMContentLoaded', () => {
+    boot().catch(err => {
+      console.error(err);
+      flash(err.message || 'Moderator page failed to load.', 'error');
+    });
+  });
 })();
