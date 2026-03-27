@@ -1685,37 +1685,41 @@ async function bootRooms() {
   }
 
   function attachDisplayTrack(track, participant) {
-    const othersGrid = document.getElementById('display-others-grid') || document.getElementById('display-layout');
-    if (!othersGrid || track.kind !== 'video') return;
+  const othersGrid = document.getElementById('display-others-grid') || document.getElementById('display-layout');
+  if (!othersGrid || track.kind !== 'video') return;
 
-    if (String(participant.identity || '').includes(`venue_${currentVenueId()}`)) {
-      return;
-    }
+  const identity = String(participant.identity || '');
 
-    let box = othersGrid.querySelector(`[data-participant="${participant.identity}"]`);
-    if (!box) {
-      box = document.createElement('div');
-      box.className = 'display-feed-box';
-      box.dataset.participant = participant.identity;
-      othersGrid.appendChild(box);
-    }
-
-    box.innerHTML = '';
-
-    const label = document.createElement('div');
-    label.className = 'display-feed-label';
-    label.textContent = participant.name || participant.identity;
-
-    const video = document.createElement('video');
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = true;
-
-    track.attach(video);
-
-    box.appendChild(label);
-    box.appendChild(video);
+  if (identity.includes(`venue_${currentVenueId()}`)) {
+    return;
   }
+
+  let box = othersGrid.querySelector(`[data-participant="${identity}"]`);
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'display-feed-box';
+    box.dataset.participant = identity;
+    othersGrid.appendChild(box);
+  }
+
+  box.innerHTML = '';
+
+  const label = document.createElement('div');
+  label.className = 'display-feed-label';
+  label.textContent = participant.name || identity;
+
+  const video = document.createElement('video');
+  video.autoplay = true;
+  video.playsInline = true;
+  video.muted = true;
+  video.style.width = '100%';
+  video.style.background = '#000';
+
+  track.attach(video);
+
+  box.appendChild(label);
+  box.appendChild(video);
+}
 
   function renderDisplayInfo() {
     const roomTitleEl = document.getElementById('display-room-title');
@@ -2129,74 +2133,89 @@ async function bootRooms() {
     renderProduction();
   }
 
-  async function bootDisplay() {
-    const othersGrid = document.getElementById('display-others-grid') || document.getElementById('display-layout');
-    const usHost = document.getElementById('display-us-feed');
+async function bootDisplay() {
+  const othersGrid = document.getElementById('display-others-grid') || document.getElementById('display-layout');
+  const usHost = document.getElementById('display-us-feed');
 
-    renderDisplayInfo();
+  renderDisplayInfo();
 
-    if (!currentRoomId()) {
-      if (othersGrid) {
-        othersGrid.innerHTML = `<div class="display-feed-box"><div class="display-placeholder">Join a room to use the display.</div></div>`;
-      }
-      if (usHost) {
-        usHost.innerHTML = `<div class="display-feed-label">US</div><div class="display-placeholder">No room joined.</div>`;
-      }
-      return;
+  if (!currentRoomId()) {
+    if (othersGrid) {
+      othersGrid.innerHTML = `<div class="display-feed-box"><div class="display-placeholder">Join a room to use the display.</div></div>`;
     }
-
-    if (!lk) throw new Error('LiveKit client library is not loaded.');
-
-    await lk.connect({
-      roomName: livekitRoomName(currentRoomId()),
-      identity: `display_${currentVenueId()}`,
-      participantName: `Display ${currentVenueId()}`,
-      canPublish: false,
-      canSubscribe: true
-    });
-
-    lk.onTrackSubscribed(({ track, participant }) => {
-      attachDisplayTrack(track, participant);
-    });
-
-    lk.onTrackUnsubscribed(({ track, participant }) => {
-      const target = document.querySelector(`[data-participant="${participant.identity}"]`);
-      if (target && track.kind === 'video') {
-        target.innerHTML = `<div class="display-feed-label">${esc(participant.name || participant.identity)}</div><div class="display-placeholder">Feed disconnected.</div>`;
-      }
-    });
-
-    const room = lk.getRoom?.();
-    if (room?.remoteParticipants) {
-      room.remoteParticipants.forEach((participant) => {
-        participant.trackPublications.forEach((pub) => {
-          if (pub.track) attachDisplayTrack(pub.track, participant);
-        });
-      });
-    }
-
     if (usHost) {
-      if (state.localStream) {
-        usHost.innerHTML = '';
-        const label = document.createElement('div');
-        label.className = 'display-feed-label';
-        label.textContent = 'US';
-
-        const video = document.createElement('video');
-        video.autoplay = true;
-        video.playsInline = true;
-        video.muted = true;
-        video.srcObject = state.localStream;
-
-        usHost.appendChild(label);
-        usHost.appendChild(video);
-      } else {
-        usHost.innerHTML = `<div class="display-feed-label">US</div><div class="display-placeholder">Open production on this device to preview your local feed.</div>`;
-      }
+      usHost.innerHTML = `<div class="display-feed-label">US</div><div class="display-placeholder">No room joined.</div>`;
     }
-
-    window.addEventListener('beforeunload', clearDisplayTimer);
+    return;
   }
+
+  if (!lk) throw new Error('LiveKit client library is not loaded.');
+
+  await lk.connect({
+    roomName: livekitRoomName(currentRoomId()),
+    identity: `display_${currentVenueId()}_${Date.now()}`,
+    participantName: `Display ${currentVenueId()}`,
+    canPublish: false,
+    canSubscribe: true
+  });
+
+  const room = lk.getRoom?.();
+  if (!room) throw new Error('LiveKit room did not initialize.');
+
+  const renderParticipantTrack = (track, participant) => {
+    if (!track || track.kind !== 'video') return;
+    attachDisplayTrack(track, participant);
+  };
+
+  lk.onTrackSubscribed(({ track, participant }) => {
+    renderParticipantTrack(track, participant);
+  });
+
+  lk.onTrackUnsubscribed(({ track, participant }) => {
+    const target = document.querySelector(`[data-participant="${participant.identity}"]`);
+    if (target && track.kind === 'video') {
+      target.innerHTML = `
+        <div class="display-feed-label">${esc(participant.name || participant.identity)}</div>
+        <div class="display-placeholder">Feed disconnected.</div>
+      `;
+    }
+  });
+
+  room.remoteParticipants.forEach((participant) => {
+    participant.trackPublications.forEach((pub) => {
+      if (pub.track && pub.track.kind === 'video') {
+        renderParticipantTrack(pub.track, participant);
+      }
+    });
+  });
+
+  if (usHost) {
+    if (state.localStream) {
+      usHost.innerHTML = '';
+      const label = document.createElement('div');
+      label.className = 'display-feed-label';
+      label.textContent = 'US';
+
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      video.srcObject = state.localStream;
+
+      usHost.appendChild(label);
+      usHost.appendChild(video);
+    } else {
+      usHost.innerHTML = `
+        <div class="display-feed-label">US</div>
+        <div class="display-placeholder">
+          Open production on this same device to preview your own local feed.
+        </div>
+      `;
+    }
+  }
+
+  window.addEventListener('beforeunload', clearDisplayTimer);
+}
 
   async function bootPulse() {
     renderPulse();
