@@ -2075,8 +2075,8 @@ async function bootRooms() {
 
   async function bootProduction() {
     const preview = document.getElementById('production-preview');
-    const startBtn = document.getElementById('start-feed') || document.getElementById('start-feed-btn');
-    const stopBtn = document.getElementById('stop-feed') || document.getElementById('stop-feed-btn');
+    const startBtn = document.getElementById('start-feed-btn') || document.getElementById('start-feed-btn');
+    const stopBtn = document.getElementById('stop-feed-btn') || document.getElementById('stop-feed-btn');
 
     if (startBtn) {
       startBtn.onclick = async () => {
