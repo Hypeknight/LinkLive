@@ -2293,8 +2293,16 @@ async function bootRooms() {
       setConnection(false, 'Connecting');
       await loadProfileAndVenue();
       await refresh();
-      await bindVenueActions();
-      setConnection(true, 'Connected');
+
+const page = document.body.dataset.page;
+if (page === 'venue-rooms') await bootRooms();
+if (page === 'venue-production') await bootProduction();
+if (page === 'venue-display') await bootDisplay();
+if (page === 'venue-pulse') await bootPulse();
+if (page === 'venue-local-controls') await bootLocalControls();
+
+await bindVenueActions();
+setConnection(true, 'Connected');
 
       [
         'rooms',
