@@ -1,9 +1,135 @@
 <!doctype html><html lang="en"><head>
 <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Linkd'N V2 Moderator Rooms</title>
-<link rel="stylesheet" href="/common/app.css" /><link rel="stylesheet" href="/common-v2/v2.css" />
-<script src="/common/config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/common/supabase.js"></script><script src="/common/db.js"></script><script src="/common/ui.js"></script><script src="/common/auth.js"></script>
-<script src="/common-v2/utils.js"></script><script src="/common-v2/client.js"></script><script src="/common-v2/opportunity-service.js"></script>
-<script defer src="/live-v2/assets/js/moderator-v2.js"></script></head>
-<body data-page="v2-mod-rooms"><div class="shell"><aside class="sidebar"><div class="brand-row"><span class="brand-mark"></span><div><div class="brand" data-app-name></div><div class="sub">Moderator V2</div></div></div><nav class="nav"><a class="active" href="/live-v2/moderator/rooms.html">Rooms</a><a href="/live-v2/moderator/scheduling.html">Scheduling</a><a href="/live-v2/moderator/oversight.html">Oversight</a><a href="/live-v2/moderator/opportunities.html">Opportunities</a></nav></aside><main class="main"><header class="header"><div><h1>Rooms</h1><p>Manage room health, pulse control, and show state.</p></div><div class="header-right"><div id="current-user"></div><div id="connection-state" class="connection offline" data-connection-status>Offline</div><button id="logout-button" class="secondary" type="button">Logout</button></div></header><div id="flash-host"></div><section class="v2-grid-2"><article class="v2-card"><table><thead><tr><th>Room</th><th>Zone</th><th>Status</th><th>Connected</th><th>Live Pulse</th><th>Action</th></tr></thead><tbody id="v2-mod-rooms-body"></tbody></table></article><article class="v2-card v2-stack"><label>Select Room<select id="v2-mod-room-select"></select></label><div id="v2-mod-room-summary"></div><div class="v2-grid-2"><div class="v2-card"><h4>Connected Venues</h4><table><thead><tr><th>Venue</th><th>Status</th><th>Feed</th><th>Joined</th></tr></thead><tbody id="v2-mod-room-members"></tbody></table></div><div class="v2-card v2-stack"><h4>Live Pulse</h4><div id="v2-mod-room-prompt"></div><form id="v2-mod-pulse-form" class="v2-stack"><input type="hidden" name="room_id" /><textarea name="prompt_text" rows="3" placeholder="Which venue won that round?"></textarea><select name="cta_type"><option value="vote">vote</option><option value="comment">comment</option><option value="yell">yell</option></select><select name="prompt_type"><option value="battle">battle</option><option value="energy">energy</option><option value="crowd_vote">crowd_vote</option><option value="reaction">reaction</option></select><input type="datetime-local" name="ends_at" /><input name="option_labels" placeholder="Venue A, Venue B, Run It Back" /><label><input type="checkbox" name="allow_comments" checked /> Allow comments</label><label><input type="checkbox" name="allow_hype" checked /> Allow hype</label><label><input type="checkbox" name="show_results_after_close" /> Show results after close</label><input type="datetime-local" name="results_visible_until" /><div class="v2-button-row"><button type="submit">Launch Pulse</button><button type="button" id="v2-mod-close-pulse">Close Live Pulse</button></div></form></div></div><div class="v2-card"><h4>Show State</h4><form id="v2-mod-show-form" class="v2-stack"><input type="hidden" name="room_id" /><input name="current_segment" placeholder="Freestyle, Bottle War, Dance Battle..." /><input name="current_round" placeholder="Round 1, Final Round..." /><input name="event_type" placeholder="battle, freestyle, reaction..." /><button type="submit">Update Show State</button></form></div></article></section></main></div></body></html>
+<link rel="stylesheet" href="/common/app.css" />
+<link rel="stylesheet" href="/common-v2/v2.css" />
+<script src="/common/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/common/supabase.js"></script>
+<script src="/common/db.js"></script>
+<script src="/common/ui.js"></script>
+<script src="/common/auth.js"></script>
+<script src="/common-v2/utils.js"></script>
+<script src="/common-v2/client.js"></script>
+<script src="/common-v2/opportunity-service.js"></script>
+<script defer src="/live-v2/assets/js/moderator-v2.js"></script>
+</head>
+<body data-page="v2-mod-rooms">
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand-row">
+                <span class="brand-mark">
+
+                </span>
+                <div>
+                    <div class="brand" data-app-name></div>
+                    <div class="sub">Moderator V2</div>
+                </div>
+            </div>
+            <nav class="nav">
+                <a class="active" href="/live-v2/moderator/rooms.html">Rooms</a>
+                <a href="/live-v2/moderator/scheduling.html">Scheduling</a>
+                <a href="/live-v2/moderator/oversight.html">Oversight</a>
+                <a href="/live-v2/moderator/opportunities.html">Opportunities</a>
+            </nav>
+        </aside>
+        <main class="main">
+            <header class="header">
+                <div>
+                    <h1>Rooms</h1>
+                    <p>Manage room health, pulse control, and show state.</p>
+                </div>
+                <div class="header-right">
+                    <div id="current-user">
+
+                    </div>
+                    <div id="connection-state" class="connection offline" data-connection-status>Offline</div>
+                    <button id="logout-button" class="secondary" type="button">Logout</button>
+                </div>
+            </header>
+            <div id="flash-host">
+
+            </div>
+            <section class="v2-grid-2">
+                <article class="v2-card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Room</th>
+                                <th>Zone</th>
+                                <th>Status</th>
+                                <th>Connected</th>
+                                <th>Live Pulse</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="v2-mod-rooms-body"></tbody>
+                    </table>
+                </article>
+                <article class="v2-card v2-stack">
+                    <label>Select Room<select id="v2-mod-room-select"></select></label>
+                    <div id="v2-mod-room-summary"></div>
+                    <div class="v2-grid-2"><div class="v2-card">
+                        <h4>Connected Venues</h4>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Venue</th>
+                                    <th>Status</th>
+                                    <th>Feed</th>
+                                    <th>Joined</th>
+                                </tr>
+                            </thead>
+                            <tbody id="v2-mod-room-members"></tbody>
+                        </table>
+                    </div>
+                    <div class="v2-card v2-stack">
+                        <h4>Live Pulse</h4>
+                        <div id="v2-mod-room-prompt"></div>
+                        <form id="v2-mod-pulse-form" class="v2-stack">
+                            <input type="hidden" name="room_id" />
+                            <textarea name="prompt_text" rows="3" placeholder="Which venue won that round?"></textarea>
+                            <select name="cta_type">
+                                <option value="vote">vote</option>
+                                <option value="comment">comment</option>
+                                <option value="yell">yell</option>
+                            </select>
+                            <select name="prompt_type">
+                                <option value="battle">battle</option>
+                                <option value="energy">energy</option>
+                                <option value="crowd_vote">crowd_vote</option>
+                                <option value="reaction">reaction</option>
+                            </select>
+                            <input type="datetime-local" name="ends_at" />
+                            <input name="option_labels" placeholder="Venue A, Venue B, Run It Back" />
+                            <label>
+                                <input type="checkbox" name="allow_comments" checked /> Allow comments
+                            </label>
+                            <label>
+                                <input type="checkbox" name="allow_hype" checked /> Allow hype
+                            </label>
+                            <label>
+                                <input type="checkbox" name="show_results_after_close" /> Show results after close
+                            </label>
+                            <input type="datetime-local" name="results_visible_until" />
+                            <div class="v2-button-row">
+                                <button type="submit">Launch Pulse</button>
+                                <button type="button" id="v2-mod-close-pulse">Close Live Pulse</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="v2-card">
+                    <h4>Show State</h4>
+                    <form id="v2-mod-show-form" class="v2-stack">
+                        <input type="hidden" name="room_id" />
+                        <input name="current_segment" placeholder="Freestyle, Bottle War, Dance Battle..." />
+                        <input name="current_round" placeholder="Round 1, Final Round..." />
+                        <input name="event_type" placeholder="battle, freestyle, reaction..." />
+                        <button type="submit">Update Show State</button>
+                    </form>
+                </div>
+            </article>
+        </section>
+    </main>
+</div>
