@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linkd'N V2 Pulse</title>
+  <link rel="stylesheet" href="/common/app.css" />
+  <link rel="stylesheet" href="/common-v2/v2.css" />
+  <script src="/common/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/db.js"></script>
+  <script src="/common/ui.js"></script>
+  <script src="/common-v2/utils.js"></script>
+  <script src="/common-v2/client.js"></script>
+  <script src="/common-v2/session-service.js"></script>
+  <script src="/common-v2/pulse-service.js"></script>
+  <script defer src="/public-v2/assets/js/pulse.js"></script>
+</head>
+<body>
+  <main class="shell" style="max-width:1100px;margin:0 auto;padding:16px;">
+    <section class="v2-card v2-stack" style="margin-bottom:16px;">
+      <div>
+        <h1 id="v2-pulse-venue">Venue</h1>
+        <div id="v2-pulse-room" class="v2-helper">Room</div>
+      </div>
+      <div class="v2-pill-row">
+        <span id="v2-pulse-checkin" class="v2-pill">Checking access…</span>
+        <span id="v2-pulse-session" class="v2-pill">Session…</span>
+      </div>
+    </section>
+
+    <section class="v2-grid-2">
+      <div class="v2-stack">
+        <article class="v2-card v2-stack">
+          <h2>Live Now</h2>
+          <div id="v2-prompt-text">No active pulse prompt.</div>
+          <div id="v2-prompt-meta" class="v2-helper">Waiting for next pulse…</div>
+          <div id="v2-prompt-timer" style="font-size:30px;font-weight:800;">—</div>
+          <div id="v2-cta-wrap" class="v2-stack"></div>
+        </article>
+
+        <article class="v2-card v2-stack">
+          <h2>Social</h2>
+          <textarea id="v2-comment-input" rows="4" placeholder="Drop a live comment..."></textarea>
+          <button id="v2-comment-submit" type="button">Post Comment</button>
+          <input id="v2-dj-input" type="text" placeholder="Request a song, artist, or vibe..." />
+          <button id="v2-dj-submit" type="button">Send DJ Request</button>
+        </article>
+
+        <article class="v2-card">
+          <h2>Live Comments</h2>
+          <div id="v2-comments" class="v2-stack"></div>
+        </article>
+      </div>
+
+      <div class="v2-stack">
+        <article class="v2-card">
+          <h2>Tonight’s Standings</h2>
+          <div id="v2-standings" class="v2-stack"></div>
+        </article>
+
+        <article class="v2-card v2-stack">
+          <h2>Questions</h2>
+          <div id="v2-question-text">No general question right now.</div>
+          <div id="v2-question-actions" class="v2-stack"></div>
+        </article>
+
+        <article class="v2-card v2-stack">
+          <h2>Session</h2>
+          <div class="v2-helper">You are participating as a verified guest at this venue.</div>
+          <button id="v2-leave-session" type="button">Leave Venue Session</button>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

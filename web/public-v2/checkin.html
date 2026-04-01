@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linkd'N V2 Check-In</title>
+  <link rel="stylesheet" href="/common/app.css" />
+  <link rel="stylesheet" href="/common-v2/v2.css" />
+  <script src="/common/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/common/supabase.js"></script>
+  <script src="/common/db.js"></script>
+  <script src="/common/ui.js"></script>
+  <script src="/common-v2/utils.js"></script>
+  <script src="/common-v2/client.js"></script>
+  <script src="/common-v2/session-service.js"></script>
+  <script defer src="/public-v2/assets/js/checkin.js"></script>
+</head>
+<body>
+  <main class="shell" style="max-width:620px;margin:0 auto;padding:24px;">
+    <article class="v2-card v2-stack">
+      <h1>Verify You’re At The Venue</h1>
+      <div id="v2-checkin-context" class="v2-helper">Loading venue details…</div>
+      <p class="v2-helper">Enter the venue code shown on the in-house display to unlock live participation.</p>
+      <input id="v2-checkin-code" type="text" placeholder="Enter venue code" />
+      <button id="v2-checkin-submit" type="button">Verify Presence</button>
+      <div id="v2-checkin-status" class="v2-helper">Waiting for code…</div>
+    </article>
+  </main>
+</body>
+</html>
